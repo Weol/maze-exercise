@@ -1,5 +1,8 @@
 package mazeoblig;
 
+import client.IUser;
+import simulator.PositionInMaze;
+
 import java.awt.*;
 import java.applet.*;
 
@@ -18,6 +21,11 @@ import java.applet.*;
  */
 import java.rmi.RemoteException;
 import java.rmi.NotBoundException;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Hashtable;
+import java.util.Set;
+
 /**
  * Tegner opp maze i en applet, basert p� definisjon som man finner p� RMIServer
  * RMIServer p� sin side  henter st�rrelsen fra definisjonen i Maze
@@ -28,9 +36,11 @@ import java.rmi.NotBoundException;
 public class Maze extends Applet {
 
 	private BoxMazeInterface bm;
-	private Box[][] maze;
-	public static int DIM = 30;
+	public Box[][] maze;
+	public static int DIM = 50;
 	private int dim = DIM;
+
+    public Hashtable<IUser, PositionInMaze> positions;
 
 	static int xp;
 	static int yp;
@@ -45,6 +55,7 @@ public class Maze extends Applet {
 	 */
 	public void init() {
 		int size = dim;
+
 		/*
 		 ** Kobler opp mot RMIServer, under forutsetning av at disse
 		 ** kj�rer p� samme maskin. Hvis ikke m� oppkoblingen
@@ -52,7 +63,7 @@ public class Maze extends Applet {
 		 */
 		if (server_hostname == null)
 			server_hostname = RMIServer.getHostName();
-		if (server_portnumber == 0)
+        if (server_portnumber == 0)
 			server_portnumber = RMIServer.getRMIPort();
 		try {
 			java.rmi.registry.Registry r = java.rmi.registry.LocateRegistry.
@@ -121,7 +132,13 @@ public class Maze extends Applet {
 	public void paint (Graphics g) {
 		int x, y;
 
+
 		// Tegner baser p� box-definisjonene ....
+        if (positions != null) {
+            for (PositionInMaze position : positions.values()) {
+                g.drawOval(position.getXpos() * 10 - 2 + 5, position.getYpos() * 10 - 2 + 5, 4, 4);
+            }
+        }
 
 		for (x = 1; x < (dim - 1); ++x)
 			for (y = 1; y < (dim - 1); ++y) {

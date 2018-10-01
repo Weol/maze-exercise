@@ -2,7 +2,7 @@ package mazeoblig;
 
 /**
  * <p>Title: </p>
- * RMIServer - En server som kobler seg opp å kjører server-objekter på
+ * RMIServer - En server som kobler seg opp ï¿½ kjï¿½rer server-objekter pï¿½
  * rmiregistry som startes automagisk.
  * <p>Description: </p>
  *
@@ -34,36 +34,28 @@ public class RMIServer
 
   private static BoxMaze maze;
   public static String MazeName = "Maze";
-  /**
-   * @todo: Her legger man til andre objekter som skal være på server
-  */
+
+  private static UserRegistry userRegistry;
+  public static String UserRegistryName = "UserRegistry";
 
 
   public RMIServer() throws RemoteException, MalformedURLException,
                              NotBoundException, AlreadyBoundException {
     getStaticInfo();
     LocateRegistry.createRegistry(PORT);
-    System.out.println( "RMIRegistry created on host computer " + HOST_NAME +
-                        " on port " + Integer.toString( PORT) );
+    System.out.println("RMIRegistry created on host computer " + HOST_NAME + " on port " + Integer.toString(PORT));
 
-    /*
-    ** Legger inn labyrinten
-    */
-    maze = new BoxMaze(Maze.DIM);
-    System.out.println( "Remote implementation object created" );
-    String urlString = "//" + HOST_NAME + ":" + PORT + "/" +
-                       MazeName;
+    GameServer gameServer = new GameServer(144);
 
-    Naming.rebind( urlString, maze );
-    /**
-    * @todo: Og her legges andre objekter som også skal være på server inn ....
-    */
+    userRegistry = new UserRegistry(gameServer);
+    Naming.rebind("//" + HOST_NAME + ":" + PORT + "/" + UserRegistryName, userRegistry);
+
     System.out.println( "Bindings Finished, waiting for client requests." );
   }
 
   private static void getStaticInfo() {
     /**
-     * Henter hostname på min datamaskin
+     * Henter hostname pï¿½ min datamaskin
      */
     if (HOST_NAME == null) HOST_NAME = DEFAULT_HOST;
     if (PORT == 0) PORT = DEFAULT_PORT;
@@ -75,9 +67,9 @@ public class RMIServer
         **
         ** "Internal errorjava.net.MalformedURLException: invalid authority"
         **
-        ** i tilfeller hvor navnen på maskinen ikke tilfredstiller
+        ** i tilfeller hvor navnen pï¿½ maskinen ikke tilfredstiller
         ** spesielle krav.
-        ** I så tilfelle, bruk "localhost" i stedet.
+        ** I sï¿½ tilfelle, bruk "localhost" i stedet.
         **
         ** Meldingen som gis har ingen betydning
         */
@@ -85,12 +77,12 @@ public class RMIServer
         HOST_NAME = "localhost";
       }
       catch (java.net.UnknownHostException e) {
-        System.err.println("Klarer ikke å finne egen nettadresse");
+        System.err.println("Klarer ikke ï¿½ finne egen nettadresse");
         e.printStackTrace(System.err);
       }
     }
     else
-      System.out.println("En MazeServer kjører allerede, bruk den");
+      System.out.println("En MazeServer kjï¿½rer allerede, bruk den");
 
     System.out.println("Maze server navn: " + HOST_NAME);
     System.out.println("Maze server ip:   " + myAdress.getHostAddress());
