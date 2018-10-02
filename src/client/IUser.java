@@ -7,6 +7,7 @@ import simulator.PositionInMaze;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public interface IUser extends Remote {
@@ -19,6 +20,6 @@ public interface IUser extends Remote {
 
     boolean onLeaseExpired() throws RemoteException;
 
-    void onPlayerPositionsChange(IPlayer player) throws RemoteException;
+    void onPlayerPositionsChange(Map<IPlayer, PositionInMaze> positions) throws RemoteException;
 
 }

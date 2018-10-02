@@ -45,7 +45,7 @@ public class RMIServer
     LocateRegistry.createRegistry(PORT);
     System.out.println("RMIRegistry created on host computer " + HOST_NAME + " on port " + Integer.toString(PORT));
 
-    GameServer gameServer = new GameServer(144);
+    GameServer gameServer = new GameServer(4);
 
     userRegistry = new UserRegistry(gameServer);
     Naming.rebind("//" + HOST_NAME + ":" + PORT + "/" + UserRegistryName, userRegistry);

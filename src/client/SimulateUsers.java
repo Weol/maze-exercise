@@ -1,6 +1,7 @@
 package client;
 
 import javafx.application.Platform;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.layout.Pane;
@@ -13,6 +14,7 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -22,7 +24,7 @@ public class SimulateUsers {
         Registry registry = LocateRegistry.getRegistry(RMIServer.getHostName(), RMIServer.getRMIPort());
         IUserRegistry userRegistry = (IUserRegistry) registry.lookup(RMIServer.UserRegistryName);
 
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 100; i++) {
             userRegistry.register(new User());
         }
     }
@@ -38,22 +40,26 @@ public class SimulateUsers {
             Box[][] boxMaze = gameServer.getMaze().getMaze();
 
             VirtualUser virtualUser = new VirtualUser(boxMaze);
+
+            PositionInMaze[] round = virtualUser.getIterationLoop();
+
             new Thread(() -> {
                 for (PositionInMaze positionInMaze : virtualUser.getFirstIterationLoop()) {
                     try {
                         player.moveTo(positionInMaze);
-                        Thread.sleep(100);
+                        Thread.sleep(300);
                     } catch (RemoteException e) {
                         e.printStackTrace();
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
                 }
+
                 while (true) {
-                    for (PositionInMaze positionInMaze : virtualUser.getIterationLoop()) {
+                    for (PositionInMaze positionInMaze : round) {
                         try {
                             player.moveTo(positionInMaze);
-                            Thread.sleep(100);
+                            Thread.sleep(300);
                         } catch (RemoteException e) {
                             e.printStackTrace();
                         } catch (InterruptedException e) {
@@ -78,7 +84,7 @@ public class SimulateUsers {
         }
 
         @Override
-        public void onPlayerPositionsChange(IPlayer player) throws RemoteException {
+        public void onPlayerPositionsChange(Map<IPlayer, PositionInMaze> positions) throws RemoteException {
 
         }
 

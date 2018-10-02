@@ -1,19 +1,13 @@
 package mazeoblig;
 
 import client.IUser;
-import javafx.geometry.Pos;
 import simulator.PositionInMaze;
-import sun.misc.Queue;
 
-import javax.swing.text.Position;
 import java.io.Serializable;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.*;
 
 public class GameServer extends UnicastRemoteObject implements IGameServer {
 
@@ -21,15 +15,37 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
 
     private BoxMaze maze;
 
-    private Hashtable<IUser, IPlayer> players;
+    private Map<IUser, IPlayer> players;
     private Executor notificationService;
-    private Set<PositionUpdate> pendingPositionChanges;
+    private Map<IPlayer, PositionInMaze> pendingPositionChanges;
+    private IUser[] users;
 
     protected GameServer(int tickrate) throws RemoteException {
         super();
-        players = new Hashtable<>();
+        players = new ConcurrentHashMap<>();
         notificationService = Executors.newFixedThreadPool(NOTIFICATION_SERVICE_THREADS);
         maze = new BoxMaze(Maze.DIM);
+        pendingPositionChanges = new Hashtable<>();
+        users = new IUser[0];
+
+        Executor executor = Executors.newFixedThreadPool(1000);
+        Timer timer = new Timer();
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                if (pendingPositionChanges.size() > 0) {
+                    executor.execute(() -> {
+                        for (IUser user : players.keySet()) {
+                            try {
+                                user.onPlayerPositionsChange(pendingPositionChanges);
+                            } catch (RemoteException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
+                }
+            }
+        }, 1000 / tickrate, 1000 / tickrate);
     }
 
     public void onUserConnected(IUser user) throws RemoteException {
@@ -49,33 +65,31 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
     }
 
     public void broadcastPlayerConnected(IPlayer player) {
-        notificationService.execute(() -> players.keySet().forEach(user -> {
-            try {
-                user.onPlayerConnected(player);
-            } catch (RemoteException e) {
-                e.printStackTrace();
+        notificationService.execute(() -> {
+            for (IUser user : players.keySet()) {
+                try {
+                    user.onPlayerConnected(player);
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                }
             }
-        }));
+        });
     }
 
     public void broadcastPlayerDisconnected(IPlayer player) {
-        notificationService.execute(() -> players.keySet().forEach(user -> {
-            try {
-                user.onPlayerDisconnected(player);
-            } catch (RemoteException e) {
-                e.printStackTrace();
+        notificationService.execute(() -> {
+            for (IUser user : players.keySet()) {
+                try {
+                    user.onPlayerDisconnected(player);
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                }
             }
-        }));
+        });
     }
 
     public void onPlayerPositionChanged(IPlayer player, PositionInMaze newPosition) {
-        notificationService.execute(() -> players.keySet().forEach(user -> {
-            try {
-                user.onPlayerPositionsChange(player);
-            } catch (RemoteException e) {
-                e.printStackTrace();
-            }
-        }));
+        pendingPositionChanges.put(player, newPosition);
     }
 
     @Override
@@ -115,23 +129,4 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
 
     }
 
-    public class PositionUpdate implements Serializable {
-
-        private IPlayer player;
-        private PositionInMaze position;
-
-        public PositionUpdate(IPlayer player, PositionInMaze position) {
-            this.player = player;
-            this.position = position;
-        }
-
-        public IPlayer getPlayer() {
-            return player;
-        }
-
-        public PositionInMaze getPosition() {
-            return position;
-        }
-
-    }
 }

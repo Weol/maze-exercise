@@ -28,8 +28,9 @@ import java.util.Timer;
 public class Client extends Application {
 
     private Stage stage;
+    private Canvas playerCanvas;
 
-    private Set<IPlayer> players;
+    private Map<IPlayer, PositionInMaze> players;
 
     Box[][] boxMaze;
 
@@ -39,7 +40,7 @@ public class Client extends Application {
 
     @Override
     public void start(Stage stage) throws Exception {
-        players = Collections.synchronizedSet(new HashSet<>());
+        players = new Hashtable<>();
         this.stage = stage;
 
         Registry registry = LocateRegistry.getRegistry(RMIServer.getHostName(), RMIServer.getRMIPort());
@@ -73,7 +74,7 @@ public class Client extends Application {
         }
     }
 
-    public void paintPositions(GraphicsContext g, PositionInMaze[] positions, Box[][] boxMaze) {
+    public void paintPositions(GraphicsContext g, Map<IPlayer, PositionInMaze> map, Box[][] boxMaze) {
         g.setFill(Color.BLUE);
         g.setLineWidth(2);
 
@@ -85,7 +86,9 @@ public class Client extends Application {
         int dimension = boxMaze.length;
         int radius = 4;
 
-        for (PositionInMaze position : positions) {
+        System.out.println(System.currentTimeMillis());
+
+        for (PositionInMaze position : map.values()) {
             int x = position.getXpos() + 1;
             int y = position.getYpos() + 1;
 
@@ -102,7 +105,7 @@ public class Client extends Application {
         public void onGameReady(IGameServer gameServer, IPlayer player) throws RemoteException {
             boxMaze = gameServer.getMaze().getMaze();
             for (IPlayer iPlayer : gameServer.getPlayers()) {
-                players.add(iPlayer);
+                players.put(iPlayer, iPlayer.getPosition());
             }
 
             Platform.runLater(() -> {
@@ -128,28 +131,11 @@ public class Client extends Application {
                     paintMaze(mazeCanvas.getGraphicsContext2D(), boxMaze);
                 });
 
-                Canvas playerCanvas = new Canvas();
+                playerCanvas = new Canvas();
                 playerCanvas.widthProperty().bind(mazeCanvas.widthProperty());
                 playerCanvas.heightProperty().bind(mazeCanvas.heightProperty());
                 playerCanvas.layoutXProperty().bind(mazeCanvas.layoutXProperty());
                 playerCanvas.layoutYProperty().bind(mazeCanvas.layoutYProperty());
-
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        PositionInMaze[] positions = new PositionInMaze[players.size()];
-                        int i = 0;
-                        for (IPlayer iPlayer : players) {
-                            try {
-                                positions[i++] = iPlayer.getPosition();
-                            } catch (RemoteException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                        paintPositions(playerCanvas.getGraphicsContext2D(), positions, boxMaze);
-                    }
-                }, 50, 50);
 
                 pane.getChildren().add(mazeCanvas);
                 pane.getChildren().add(playerCanvas);
@@ -167,7 +153,7 @@ public class Client extends Application {
                     for (PositionInMaze positionInMaze : virtualUser.getIterationLoop()) {
                         try {
                             player.moveTo(positionInMaze);
-                            Thread.sleep(100);
+                            Thread.sleep(300);
                         } catch (RemoteException e) {
                             e.printStackTrace();
                         } catch (InterruptedException e) {
@@ -180,7 +166,7 @@ public class Client extends Application {
 
         @Override
         public void onPlayerConnected(IPlayer player) throws RemoteException {
-            players.add(player);
+            players.put(player, player.getPosition());
         }
 
         @Override
@@ -194,8 +180,10 @@ public class Client extends Application {
         }
 
         @Override
-        public void onPlayerPositionsChange(IPlayer player) throws RemoteException {
-
+        public void onPlayerPositionsChange(Map<IPlayer, PositionInMaze> positions) throws RemoteException {
+            System.out.format("Updating %d positions\n", positions.size());
+            players.putAll(positions);
+            paintPositions(playerCanvas.getGraphicsContext2D(), players, boxMaze);
         }
 
     }
