@@ -4,6 +4,7 @@ import client.IUser;
 import simulator.PositionInMaze;
 
 import java.io.Serializable;
+import java.rmi.ConnectException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
@@ -17,6 +18,7 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
 
     private Map<IUser, IPlayer> players;
     private Executor notificationService;
+    private ThreadPoolExecutor executor;
     private Map<IPlayer, PositionInMaze> pendingPositionChanges;
     private IUser[] users;
 
@@ -27,52 +29,50 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
         maze = new BoxMaze(Maze.DIM);
         pendingPositionChanges = new Hashtable<>();
         users = new IUser[0];
+        executor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
 
-        Executor executor = Executors.newFixedThreadPool(1000);
         Timer timer = new Timer();
-        timer.scheduleAtFixedRate(new TimerTask() {
+        timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                if (pendingPositionChanges.size() > 0) {
-                    executor.execute(() -> {
-                        for (IUser user : players.keySet()) {
-                            try {
-                                user.onPlayerPositionsChange(pendingPositionChanges);
-                            } catch (RemoteException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    });
-                }
+                System.out.println(executor.getQueue().size());
             }
-        }, 1000 / tickrate, 1000 / tickrate);
+        },1000, 1000);
     }
 
     public void onUserConnected(IUser user) throws RemoteException {
-        IPlayer player = new Player(new PositionInMaze(0, 0));
-        players.put(user, player);
+        if (!players.containsKey(user)) {
+            IPlayer player = new Player(new PositionInMaze(0, 0));
+            players.put(user, player);
 
-        broadcastPlayerConnected(player);
+            broadcastPlayerConnected(player);
 
-        user.onGameReady(this, player);
+            System.out.println("New client has connected");
+
+            user.onGameReady(this, player);
+        }
     }
 
     public void onUserDisconnected(IUser user) {
-        IPlayer player = players.get(user);
-        players.remove(user);
+        if (players.containsKey(user)) {
+            IPlayer player = players.get(user);
+            players.remove(user);
 
-        broadcastPlayerDisconnected(player);
+            System.out.println("Client has disconnected");
+
+            broadcastPlayerDisconnected(player);
+        }
     }
 
     public void broadcastPlayerConnected(IPlayer player) {
         notificationService.execute(() -> {
-            for (IUser user : players.keySet()) {
+            for (IUser user : players.keySet())
                 try {
                     user.onPlayerConnected(player);
                 } catch (RemoteException e) {
+                    onUserDisconnected(user);
                     e.printStackTrace();
                 }
-            }
         });
     }
 
@@ -82,6 +82,7 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
                 try {
                     user.onPlayerDisconnected(player);
                 } catch (RemoteException e) {
+                    onUserDisconnected(user);
                     e.printStackTrace();
                 }
             }
@@ -89,7 +90,16 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
     }
 
     public void onPlayerPositionChanged(IPlayer player, PositionInMaze newPosition) {
-        pendingPositionChanges.put(player, newPosition);
+        executor.execute(() -> {
+            for (IUser user : players.keySet()) {
+                try {
+                    user.onPlayerPositionChange(player, newPosition);
+                } catch (RemoteException e) {
+                    onUserDisconnected(user);
+                    //e.printStackTrace();
+                }
+            }
+        });
     }
 
     @Override

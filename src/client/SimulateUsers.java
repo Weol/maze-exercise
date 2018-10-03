@@ -14,60 +14,74 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public class SimulateUsers {
+
+    private static List<User> readyUsers = new ArrayList<>();
 
     public static void main(String[] args) throws RemoteException, NotBoundException, InterruptedException {
         Registry registry = LocateRegistry.getRegistry(RMIServer.getHostName(), RMIServer.getRMIPort());
         IUserRegistry userRegistry = (IUserRegistry) registry.lookup(RMIServer.UserRegistryName);
 
-        for (int i = 0; i < 100; i++) {
+        int count = 500;
+
+        for (int i = 0; i < count; i++) {
             userRegistry.register(new User());
+        }
+
+        int nThreads = 10;
+        ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(nThreads);
+
+        int usersPerThread = count / nThreads;
+
+        for (int i = 0; i < nThreads; i++) {
+            List<User> subUsers = readyUsers.subList(i * usersPerThread, Math.min((i+1)*usersPerThread, readyUsers.size()));
+            System.out.println(i * usersPerThread + " to " + Math.max((i+1)*usersPerThread, readyUsers.size()));
+            executor.scheduleWithFixedDelay(() -> {
+                for (User subUser : subUsers) {
+                    if (subUser.moves.size() != 0) {
+                        try {
+                            subUser.player.moveTo(subUser.moves.poll());
+                        } catch (RemoteException e) {
+                            e.printStackTrace();
+                        }
+                    } else {
+                        subUser.moves.addAll(subUser.round);
+                    }
+                }
+            }, 1, 1, TimeUnit.SECONDS);
         }
     }
 
     public static class User extends UnicastRemoteObject implements IUser {
 
-        protected User() throws RemoteException {
+        private IPlayer player;
+        private Deque<PositionInMaze> moves;
+        private List<PositionInMaze> round;
 
+        protected User() throws RemoteException {
+            moves = new LinkedList<>();
+            round = new ArrayList<>();
         }
 
         @Override
         public void onGameReady(IGameServer gameServer, IPlayer player) throws RemoteException {
             Box[][] boxMaze = gameServer.getMaze().getMaze();
-
             VirtualUser virtualUser = new VirtualUser(boxMaze);
 
-            PositionInMaze[] round = virtualUser.getIterationLoop();
+            this.player = player;
 
-            new Thread(() -> {
-                for (PositionInMaze positionInMaze : virtualUser.getFirstIterationLoop()) {
-                    try {
-                        player.moveTo(positionInMaze);
-                        Thread.sleep(300);
-                    } catch (RemoteException e) {
-                        e.printStackTrace();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
+            moves.addAll(Arrays.asList(virtualUser.getFirstIterationLoop()));
+            round.addAll(Arrays.asList(virtualUser.getIterationLoop()));
 
-                while (true) {
-                    for (PositionInMaze positionInMaze : round) {
-                        try {
-                            player.moveTo(positionInMaze);
-                            Thread.sleep(300);
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            }).start();
+            moves.addAll(round);
+
+            readyUsers.add(this);
         }
 
         @Override
@@ -84,10 +98,9 @@ public class SimulateUsers {
         }
 
         @Override
-        public void onPlayerPositionsChange(Map<IPlayer, PositionInMaze> positions) throws RemoteException {
+        public void onPlayerPositionChange(IPlayer player, PositionInMaze position) throws RemoteException {
 
         }
-
     }
 
 }

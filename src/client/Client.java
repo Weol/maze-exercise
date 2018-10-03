@@ -24,6 +24,7 @@ import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
 import java.util.Timer;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Client extends Application {
 
@@ -40,7 +41,7 @@ public class Client extends Application {
 
     @Override
     public void start(Stage stage) throws Exception {
-        players = new Hashtable<>();
+        players = new ConcurrentHashMap<>();
         this.stage = stage;
 
         Registry registry = LocateRegistry.getRegistry(RMIServer.getHostName(), RMIServer.getRMIPort());
@@ -154,6 +155,7 @@ public class Client extends Application {
                         try {
                             player.moveTo(positionInMaze);
                             Thread.sleep(300);
+                            paintPositions(playerCanvas.getGraphicsContext2D(), players, boxMaze);
                         } catch (RemoteException e) {
                             e.printStackTrace();
                         } catch (InterruptedException e) {
@@ -171,7 +173,9 @@ public class Client extends Application {
 
         @Override
         public void onPlayerDisconnected(IPlayer player) throws RemoteException {
-            players.remove(player);
+            if (player != null) {
+                players.remove(player);
+            }
         }
 
         @Override
@@ -180,10 +184,9 @@ public class Client extends Application {
         }
 
         @Override
-        public void onPlayerPositionsChange(Map<IPlayer, PositionInMaze> positions) throws RemoteException {
-            System.out.format("Updating %d positions\n", positions.size());
-            players.putAll(positions);
-            paintPositions(playerCanvas.getGraphicsContext2D(), players, boxMaze);
+        public void onPlayerPositionChange(IPlayer player, PositionInMaze position) throws RemoteException {
+            players.put(player, position);
+
         }
 
     }
