@@ -9,6 +9,9 @@ import simulator.PositionInMaze;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 public class Node extends UnicastRemoteObject implements INode {
 
@@ -18,9 +21,13 @@ public class Node extends UnicastRemoteObject implements INode {
 
     private IGameServer parentServer;
 
+    private ThreadPoolExecutor executor;
+
     public Node(IUser user) throws RemoteException {
         this.user = user;
         this.users = new CopyOnWriteArraySet<>();
+
+        executor = (ThreadPoolExecutor) Executors.newSingleThreadExecutor();
     }
 
     @Override
@@ -65,14 +72,17 @@ public class Node extends UnicastRemoteObject implements INode {
     @Override
     public void onPlayerPositionChange(IPlayer player, PositionInMaze position) throws RemoteException {
         user.onPlayerPositionChange(player, position);
-        for (IUser user : users) {
-            try {
-                user.onPlayerPositionChange(player, position);
-            } catch (RemoteException e) {
-                e.printStackTrace();
-                users.remove(user);
+        System.out.println(executor.getQueue().size());
+        executor.execute(() -> {
+            for (IUser user : users) {
+                try {
+                    user.onPlayerPositionChange(player, position);
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                    users.remove(user);
+                }
             }
-        }
+        });
     }
 
     @Override
