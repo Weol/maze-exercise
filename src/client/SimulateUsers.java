@@ -28,7 +28,7 @@ public class SimulateUsers {
         System.setProperty("java.rmi.server.hostname", args[1]);
 
         Registry registry = LocateRegistry.getRegistry(args[0], RMIServer.getRMIPort());
-        IUserRegistry userRegistry = (IUserRegistry) registry.lookup(RMIServer.UserRegistryName);
+        IGameServer userRegistry = (IGameServer) registry.lookup(RMIServer.GameServerName);
 
         int count = 2000;
 

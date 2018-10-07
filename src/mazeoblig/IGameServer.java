@@ -11,8 +11,6 @@ public interface IGameServer extends Remote {
 
     int[][] getPlayerMap() throws RemoteException;
 
-    void onUserConnected(IUser user) throws RemoteException;
-
-    void onUserDisconnected(IUser user) throws RemoteException;
+    void register(IUser user) throws RemoteException;
 
 }

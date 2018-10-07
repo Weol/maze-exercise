@@ -32,11 +32,8 @@ public class RMIServer
   private static InetAddress myAdress = null;
   private static RMIServer rmi;
 
-  private static BoxMaze maze;
-  public static String MazeName = "Maze";
-
-  private static UserRegistry userRegistry;
-  public static String UserRegistryName = "UserRegistry";
+  private static IGameServer gameServer;
+  public static String GameServerName = "GameServer";
 
 
   public RMIServer() throws RemoteException, MalformedURLException,
@@ -48,10 +45,8 @@ public class RMIServer
     LocateRegistry.createRegistry(PORT);
     System.out.println("RMIRegistry created on host computer " + HOST_NAME + " on port " + Integer.toString(PORT));
 
-    GameServer gameServer = new GameServer(4);
-
-    userRegistry = new UserRegistry(gameServer);
-    Naming.rebind("//" + HOST_NAME + ":" + PORT + "/" + UserRegistryName, userRegistry);
+    IGameServer gameServer = new GameServer(4);
+    Naming.rebind("//" + HOST_NAME + ":" + PORT + "/" + GameServerName, gameServer);
 
     System.out.println( "Bindings Finished, waiting for client requests." );
   }

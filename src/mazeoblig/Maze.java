@@ -73,7 +73,6 @@ public class Maze extends Applet {
 			/*
 			 ** Henter inn referansen til Labyrinten (ROR)
 			 */
-			bm = (BoxMazeInterface) r.lookup(RMIServer.MazeName);
 			maze = bm.getMaze();
 			
 /*
@@ -94,17 +93,6 @@ public class Maze extends Applet {
 		}
 		catch (RemoteException e) {
 			System.err.println("Remote Exception: " + e.getMessage());
-			System.exit(0);
-		}
-		catch (NotBoundException f) {
-			/*
-			 ** En exception her er en indikasjon p� at man ved oppslag (lookup())
-			 ** ikke finner det objektet som man s�ker.
-			 ** �rsaken til at dette skjer kan v�re mange, men v�r oppmerksom p�
-			 ** at hvis hostname ikke er OK (RMIServer gir da feilmelding under
-			 ** oppstart) kan v�re en �rsak.
-			 */
-			System.err.println("Not Bound Exception: " + f.getMessage());
 			System.exit(0);
 		}
 	}

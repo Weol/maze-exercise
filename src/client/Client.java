@@ -42,7 +42,7 @@ public class Client extends Application {
         this.stage = stage;
 
         Registry registry = LocateRegistry.getRegistry(RMIServer.getHostName(), RMIServer.getRMIPort());
-        IUserRegistry userRegistry = (IUserRegistry) registry.lookup(RMIServer.UserRegistryName);
+        IGameServer userRegistry = (IGameServer) registry.lookup(RMIServer.GameServerName);
 
         userRegistry.register(new UserImpl());
     }
@@ -50,24 +50,6 @@ public class Client extends Application {
     private class UserImpl extends User {
 
         protected UserImpl() throws RemoteException {
-        }
-
-        @Override
-        public void onPlayerConnected(IPlayer player) throws RemoteException {
-            super.onPlayerConnected(player);
-            System.out.println("New player connected");
-        }
-
-        @Override
-        public void onPlayerDisconnected(IPlayer player) throws RemoteException {
-            super.onPlayerDisconnected(player);
-            System.out.println("A player disconnected");
-        }
-
-        @Override
-        public boolean onLeaseExpired() throws RemoteException {
-            System.out.println("Renewing lease");
-            return super.onLeaseExpired();
         }
 
         @Override

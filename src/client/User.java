@@ -33,21 +33,6 @@ public abstract class User extends UnicastRemoteObject implements IUser {
     }
 
     @Override
-    public void onPlayerConnected(IPlayer player) throws RemoteException {
-
-    }
-
-    @Override
-    public void onPlayerDisconnected(IPlayer player) throws RemoteException {
-
-    }
-
-    @Override
-    public boolean onLeaseExpired() throws RemoteException {
-        return true;
-    }
-
-    @Override
     public INode requestNode() throws RemoteException {
         return new Node(this);
     }
