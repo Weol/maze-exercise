@@ -29,13 +29,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Client extends Application {
 
     private Stage stage;
-    private Canvas playerCanvas;
+    private MazePane mazePane;
 
     private Map<IPlayer, PositionInMaze> players;
 
-    Box[][] boxMaze;
-
-    public static void main(String[] args) throws RemoteException, NotBoundException {
+    public static void main(String[] args) {
         launch();
     }
 
@@ -47,148 +45,58 @@ public class Client extends Application {
         Registry registry = LocateRegistry.getRegistry(RMIServer.getHostName(), RMIServer.getRMIPort());
         IUserRegistry userRegistry = (IUserRegistry) registry.lookup(RMIServer.UserRegistryName);
 
-        userRegistry.register(new User());
+        userRegistry.register(new UserImpl());
     }
 
-    public void paintMaze(GraphicsContext g, Box[][] boxMaze) {
-        g.setStroke(Color.DARKGRAY);
-        g.setLineWidth(2);
+    private class UserImpl extends User {
 
-        double w = g.getCanvas().widthProperty().get();
-        double h = g.getCanvas().heightProperty().get();
-
-        g.clearRect(0,0, w, h);
-
-        int dimension = boxMaze.length;
-
-        for (int x = 1; x < (boxMaze.length - 1); ++x) {
-            for (int y = 1; y < (boxMaze.length - 1); ++y) {
-                if (boxMaze[x][y].getUp() == null)
-                    g.strokeLine(x * w / dimension, y * h / dimension, x * w / dimension + w / dimension, y * h / dimension);
-                if (boxMaze[x][y].getDown() == null)
-                    g.strokeLine(x * w / dimension, y * h / dimension + h / dimension, x * w / dimension + w / dimension, y * h / dimension + h / dimension);
-                if (boxMaze[x][y].getLeft() == null)
-                    g.strokeLine(x * w / dimension, y * h / dimension, x * w / dimension, y * h / dimension + h / dimension);
-                if (boxMaze[x][y].getRight() == null)
-                    g.strokeLine(x * w / dimension + w / dimension, y * h / dimension, x * w / dimension + w / dimension, y * h / dimension + h / dimension);
-            }
-        }
-    }
-
-    public void paintPositions(GraphicsContext g, Map<IPlayer, PositionInMaze> map, Box[][] boxMaze) {
-        g.setFill(Color.BLUE);
-        g.setLineWidth(2);
-
-        double w = g.getCanvas().widthProperty().get();
-        double h = g.getCanvas().heightProperty().get();
-
-        g.clearRect(0,0, w, h);
-
-        int dimension = boxMaze.length;
-        int radius = 4;
-
-        System.out.println(System.currentTimeMillis());
-
-        for (PositionInMaze position : map.values()) {
-            int x = position.getXpos() + 1;
-            int y = position.getYpos() + 1;
-
-            g.fillOval(x * w / dimension - w / dimension / 2 - radius / 2, y * h / dimension - h / dimension / 2 - radius / 2, radius, radius);
-        }
-    }
-
-    public class User extends UnicastRemoteObject implements IUser {
-
-        protected User() throws RemoteException {
+        protected UserImpl() throws RemoteException {
         }
 
         @Override
         public void onGameReady(IGameServer gameServer, IPlayer player) throws RemoteException {
-            boxMaze = gameServer.getMaze().getMaze();
-            for (IPlayer iPlayer : gameServer.getPlayers()) {
-                players.put(iPlayer, iPlayer.getPosition());
-            }
+            super.onGameReady(gameServer, player);
 
             Platform.runLater(() -> {
-                Pane pane = new Pane();
+                try {
+                    mazePane = new MazePane(getMaze(), players);
 
-                Canvas mazeCanvas = new Canvas();
-                mazeCanvas.layoutXProperty().bind(pane.widthProperty().divide(2).subtract(mazeCanvas.widthProperty().divide(2)));
-                mazeCanvas.layoutYProperty().bind(pane.heightProperty().divide(2).subtract(mazeCanvas.heightProperty().divide(2)));
+                    mazePane.prefHeightProperty().bind(stage.heightProperty());
+                    mazePane.prefWidthProperty().bind(stage.widthProperty());
+                    mazePane.setVisible(true);
 
-                pane.widthProperty().addListener((observable, old, now) -> {
-                    double min = Math.min(pane.widthProperty().get(), pane.heightProperty().get());
-                    mazeCanvas.setHeight(min);
-                    mazeCanvas.setWidth(min);
+                    stage.setScene(new Scene(mazePane));
+                    stage.minWidthProperty().set(getMaze().length * 10);
+                    stage.minHeightProperty().set(getMaze().length * 10 + 30);
 
-                    paintMaze(mazeCanvas.getGraphicsContext2D(), boxMaze);
-                });
-
-                pane.heightProperty().addListener((observable, old, now) -> {
-                    double min = Math.min(pane.widthProperty().get(), pane.heightProperty().get());
-                    mazeCanvas.setHeight(min);
-                    mazeCanvas.setWidth(min);
-
-                    paintMaze(mazeCanvas.getGraphicsContext2D(), boxMaze);
-                });
-
-                playerCanvas = new Canvas();
-                playerCanvas.widthProperty().bind(mazeCanvas.widthProperty());
-                playerCanvas.heightProperty().bind(mazeCanvas.heightProperty());
-                playerCanvas.layoutXProperty().bind(mazeCanvas.layoutXProperty());
-                playerCanvas.layoutYProperty().bind(mazeCanvas.layoutYProperty());
-
-                pane.getChildren().add(mazeCanvas);
-                pane.getChildren().add(playerCanvas);
-
-                stage.setScene(new Scene(pane));
-                stage.minWidthProperty().set(boxMaze.length * 10);
-                stage.minHeightProperty().set(boxMaze.length * 10 + 30);
-
-                stage.show();
+                    stage.show();
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                }
             });
 
-            VirtualUser virtualUser = new VirtualUser(boxMaze);
+            VirtualUser virtualUser = new VirtualUser(getMaze());
             new Thread(() -> {
                 while (true) {
                     for (PositionInMaze positionInMaze : virtualUser.getIterationLoop()) {
                         try {
                             player.moveTo(positionInMaze);
                             Thread.sleep(300);
-                            paintPositions(playerCanvas.getGraphicsContext2D(), players, boxMaze);
                         } catch (RemoteException e) {
                             e.printStackTrace();
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
+                        mazePane.repaintPositions();
                     }
                 }
             }).start();
         }
 
         @Override
-        public void onPlayerConnected(IPlayer player) throws RemoteException {
-            players.put(player, player.getPosition());
-        }
-
-        @Override
-        public void onPlayerDisconnected(IPlayer player) throws RemoteException {
-            if (player != null) {
-                players.remove(player);
-            }
-        }
-
-        @Override
-        public boolean onLeaseExpired() throws RemoteException {
-            return true;
-        }
-
-        @Override
         public void onPlayerPositionChange(IPlayer player, PositionInMaze position) throws RemoteException {
             players.put(player, position);
-
         }
-
     }
 
 }

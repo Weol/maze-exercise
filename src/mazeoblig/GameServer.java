@@ -1,6 +1,7 @@
 package mazeoblig;
 
 import client.IUser;
+import javafx.collections.transformation.SortedList;
 import simulator.PositionInMaze;
 
 import java.io.Serializable;
@@ -12,51 +13,59 @@ import java.util.concurrent.*;
 
 public class GameServer extends UnicastRemoteObject implements IGameServer {
 
-    private static final int NOTIFICATION_SERVICE_THREADS = 4;
+    private static final int PLAYERS_PER_NODE = 100;
 
     private BoxMaze maze;
 
     private Map<IUser, IPlayer> players;
-    private Executor notificationService;
-    private ThreadPoolExecutor executor;
-    private Map<IPlayer, PositionInMaze> pendingPositionChanges;
-    private IUser[] users;
+    private Map<IUser, INode> nodes;
+    private INode latestNode;
 
     protected GameServer(int tickrate) throws RemoteException {
         super();
         players = new ConcurrentHashMap<>();
-        notificationService = Executors.newFixedThreadPool(NOTIFICATION_SERVICE_THREADS);
-        maze = new BoxMaze(Maze.DIM);
-        pendingPositionChanges = new Hashtable<>();
-        users = new IUser[0];
-        executor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
+        nodes = new ConcurrentHashMap<>();
 
-        Timer timer = new Timer();
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                System.out.println(executor.getQueue().size());
-            }
-        },1000, 1000);
+        maze = new BoxMaze();
     }
 
+    @Override
     public void onUserConnected(IUser user) throws RemoteException {
         if (!players.containsKey(user)) {
             IPlayer player = new Player(new PositionInMaze(0, 0));
             players.put(user, player);
 
+            if (players.size() > nodes.size() * PLAYERS_PER_NODE) {
+                System.out.println("Creating new node!");
+                INode node = user.requestNode();
+                if (node != null) {
+                    nodes.put(user, node);
+                } else {
+                    throw new IllegalStateException("A client must accept the responsibility of a node!!!");
+                }
+                node.onGameReady(this, player);
+                latestNode = node;
+            } else {
+                INode node = latestNode;
+                node.onUserConnected(user);
+                user.onGameReady(node, player);
+            }
+
             broadcastPlayerConnected(player);
 
             System.out.println("New client has connected");
-
-            user.onGameReady(this, player);
         }
     }
 
-    public void onUserDisconnected(IUser user) {
+    @Override
+    public void onUserDisconnected(IUser user) throws RemoteException {
         if (players.containsKey(user)) {
             IPlayer player = players.get(user);
             players.remove(user);
+
+            if (nodes.containsKey(user)) {
+                throw new IllegalStateException("SHIT! A NODE DISCONNECTED!");
+            }
 
             System.out.println("Client has disconnected");
 
@@ -64,42 +73,37 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
         }
     }
 
-    public void broadcastPlayerConnected(IPlayer player) {
-        notificationService.execute(() -> {
-            for (IUser user : players.keySet())
-                try {
-                    user.onPlayerConnected(player);
-                } catch (RemoteException e) {
-                    onUserDisconnected(user);
-                    e.printStackTrace();
-                }
-        });
+    public void broadcastPlayerConnected(IPlayer player) throws RemoteException  {
+        for (INode node : nodes.values()) {
+            try {
+                node.onPlayerConnected(player);
+            } catch (RemoteException e) {
+                onUserDisconnected(node);
+                e.printStackTrace();
+            }
+        }
     }
 
-    public void broadcastPlayerDisconnected(IPlayer player) {
-        notificationService.execute(() -> {
-            for (IUser user : players.keySet()) {
-                try {
-                    user.onPlayerDisconnected(player);
-                } catch (RemoteException e) {
-                    onUserDisconnected(user);
-                    e.printStackTrace();
-                }
+    public void broadcastPlayerDisconnected(IPlayer player) throws RemoteException {
+        for (INode node : nodes.values()) {
+            try {
+                node.onPlayerDisconnected(player);
+            } catch (RemoteException e) {
+                onUserDisconnected(node);
+                e.printStackTrace();
             }
-        });
+        }
     }
 
-    public void onPlayerPositionChanged(IPlayer player, PositionInMaze newPosition) {
-        executor.execute(() -> {
-            for (IUser user : players.keySet()) {
-                try {
-                    user.onPlayerPositionChange(player, newPosition);
-                } catch (RemoteException e) {
-                    onUserDisconnected(user);
-                    //e.printStackTrace();
-                }
+    public void onPlayerPositionChanged(IPlayer player, PositionInMaze newPosition) throws RemoteException {
+        for (INode node : nodes.values()) {
+            try {
+                node.onPlayerPositionChange(player, newPosition);
+            } catch (RemoteException e) {
+                onUserDisconnected(node);
+                e.printStackTrace();
             }
-        });
+        }
     }
 
     @Override

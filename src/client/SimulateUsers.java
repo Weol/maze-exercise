@@ -22,16 +22,16 @@ import java.util.concurrent.TimeUnit;
 
 public class SimulateUsers {
 
-    private static List<User> readyUsers = new ArrayList<>();
+    private static List<UserImpl> readyUsers = new ArrayList<>();
 
     public static void main(String[] args) throws RemoteException, NotBoundException, InterruptedException {
         Registry registry = LocateRegistry.getRegistry(RMIServer.getHostName(), RMIServer.getRMIPort());
         IUserRegistry userRegistry = (IUserRegistry) registry.lookup(RMIServer.UserRegistryName);
 
-        int count = 500;
+        int count = 200;
 
         for (int i = 0; i < count; i++) {
-            userRegistry.register(new User());
+            userRegistry.register(new UserImpl());
         }
 
         int nThreads = 10;
@@ -40,13 +40,13 @@ public class SimulateUsers {
         int usersPerThread = count / nThreads;
 
         for (int i = 0; i < nThreads; i++) {
-            List<User> subUsers = readyUsers.subList(i * usersPerThread, Math.min((i+1)*usersPerThread, readyUsers.size()));
-            System.out.println(i * usersPerThread + " to " + Math.max((i+1)*usersPerThread, readyUsers.size()));
+            List<UserImpl> subUsers = readyUsers.subList(i * usersPerThread, Math.min((i+1)*usersPerThread, readyUsers.size()));
+            System.out.printf("Thread %d handles users %d to %d\n", i, i * usersPerThread, Math.min((i+1)*usersPerThread, readyUsers.size()));
             executor.scheduleWithFixedDelay(() -> {
-                for (User subUser : subUsers) {
+                for (UserImpl subUser : subUsers) {
                     if (subUser.moves.size() != 0) {
                         try {
-                            subUser.player.moveTo(subUser.moves.poll());
+                            subUser.getPlayer().moveTo(subUser.moves.poll());
                         } catch (RemoteException e) {
                             e.printStackTrace();
                         }
@@ -58,23 +58,21 @@ public class SimulateUsers {
         }
     }
 
-    public static class User extends UnicastRemoteObject implements IUser {
+    public static class UserImpl extends User {
 
-        private IPlayer player;
         private Deque<PositionInMaze> moves;
         private List<PositionInMaze> round;
 
-        protected User() throws RemoteException {
+        protected UserImpl() throws RemoteException {
             moves = new LinkedList<>();
             round = new ArrayList<>();
         }
 
         @Override
         public void onGameReady(IGameServer gameServer, IPlayer player) throws RemoteException {
-            Box[][] boxMaze = gameServer.getMaze().getMaze();
-            VirtualUser virtualUser = new VirtualUser(boxMaze);
+            super.onGameReady(gameServer, player);
 
-            this.player = player;
+            VirtualUser virtualUser = new VirtualUser(getMaze());
 
             moves.addAll(Arrays.asList(virtualUser.getFirstIterationLoop()));
             round.addAll(Arrays.asList(virtualUser.getIterationLoop()));
@@ -84,22 +82,15 @@ public class SimulateUsers {
             readyUsers.add(this);
         }
 
-        @Override
-        public void onPlayerConnected(IPlayer player) throws RemoteException {
-        }
-
-        @Override
-        public void onPlayerDisconnected(IPlayer player) throws RemoteException {
-        }
-
-        @Override
-        public boolean onLeaseExpired() throws RemoteException {
-            return true;
-        }
 
         @Override
         public void onPlayerPositionChange(IPlayer player, PositionInMaze position) throws RemoteException {
 
+        }
+
+        @Override
+        public INode requestNode() throws RemoteException {
+            return new Node(this);
         }
     }
 

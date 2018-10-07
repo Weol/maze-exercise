@@ -2,6 +2,7 @@ package client;
 
 import mazeoblig.GameServer;
 import mazeoblig.IGameServer;
+import mazeoblig.INode;
 import mazeoblig.IPlayer;
 import simulator.PositionInMaze;
 
@@ -21,5 +22,7 @@ public interface IUser extends Remote {
     boolean onLeaseExpired() throws RemoteException;
 
     void onPlayerPositionChange(IPlayer player, PositionInMaze position) throws RemoteException;
+
+    INode requestNode() throws RemoteException;
 
 }
