@@ -8,22 +8,19 @@ import simulator.PositionInMaze;
 
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 public class Node extends UnicastRemoteObject implements INode {
 
     private IUser user;
 
-    private Set<IUser> users;
+    private CopyOnWriteArraySet<IUser> users;
 
     private IGameServer parentServer;
 
     public Node(IUser user) throws RemoteException {
         this.user = user;
-        this.users = Collections.synchronizedSet(new HashSet<>());
+        this.users = new CopyOnWriteArraySet<>();
     }
 
     @Override
@@ -36,9 +33,7 @@ public class Node extends UnicastRemoteObject implements INode {
     public void onPlayerConnected(IPlayer player) throws RemoteException {
         user.onPlayerConnected(player);
 
-        Iterator<IUser> iterator = users.iterator();
-        while (iterator.hasNext()) {
-            IUser user = iterator.next();
+        for (IUser user : users) {
             try {
                 user.onPlayerConnected(player);
             } catch (RemoteException e) {
@@ -52,9 +47,7 @@ public class Node extends UnicastRemoteObject implements INode {
     public void onPlayerDisconnected(IPlayer player) throws RemoteException {
         user.onPlayerDisconnected(player);
 
-        Iterator<IUser> iterator = users.iterator();
-        while (iterator.hasNext()) {
-            IUser user = iterator.next();
+        for (IUser user : users) {
             try {
                 user.onPlayerDisconnected(player);
             } catch (RemoteException e) {
@@ -72,9 +65,7 @@ public class Node extends UnicastRemoteObject implements INode {
     @Override
     public void onPlayerPositionChange(IPlayer player, PositionInMaze position) throws RemoteException {
         user.onPlayerPositionChange(player, position);
-        Iterator<IUser> iterator = users.iterator();
-        while (iterator.hasNext()) {
-            IUser user = iterator.next();
+        for (IUser user : users) {
             try {
                 user.onPlayerPositionChange(player, position);
             } catch (RemoteException e) {
