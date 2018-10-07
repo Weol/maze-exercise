@@ -10,6 +10,7 @@ import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 
 public class Node extends UnicastRemoteObject implements INode {
@@ -34,7 +35,10 @@ public class Node extends UnicastRemoteObject implements INode {
     @Override
     public void onPlayerConnected(IPlayer player) throws RemoteException {
         user.onPlayerConnected(player);
-        for (IUser user : users) {
+
+        Iterator<IUser> iterator = users.iterator();
+        while (iterator.hasNext()) {
+            IUser user = iterator.next();
             try {
                 user.onPlayerConnected(player);
             } catch (RemoteException e) {
@@ -47,7 +51,10 @@ public class Node extends UnicastRemoteObject implements INode {
     @Override
     public void onPlayerDisconnected(IPlayer player) throws RemoteException {
         user.onPlayerDisconnected(player);
-        for (IUser user : users) {
+
+        Iterator<IUser> iterator = users.iterator();
+        while (iterator.hasNext()) {
+            IUser user = iterator.next();
             try {
                 user.onPlayerDisconnected(player);
             } catch (RemoteException e) {
@@ -65,7 +72,9 @@ public class Node extends UnicastRemoteObject implements INode {
     @Override
     public void onPlayerPositionChange(IPlayer player, PositionInMaze position) throws RemoteException {
         user.onPlayerPositionChange(player, position);
-        for (IUser user : users) {
+        Iterator<IUser> iterator = users.iterator();
+        while (iterator.hasNext()) {
+            IUser user = iterator.next();
             try {
                 user.onPlayerPositionChange(player, position);
             } catch (RemoteException e) {

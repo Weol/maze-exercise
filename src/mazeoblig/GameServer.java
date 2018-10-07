@@ -47,6 +47,7 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
                 latestNode = node;
             } else {
                 INode node = latestNode;
+                players.put(user, player);
                 node.onUserConnected(user);
                 user.onGameReady(node, player);
             }
