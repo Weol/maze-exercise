@@ -27,7 +27,7 @@ public class Node extends UnicastRemoteObject implements INode {
         this.user = user;
         this.users = new CopyOnWriteArraySet<>();
 
-        executor = (ThreadPoolExecutor) Executors.newSingleThreadExecutor();
+        executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(10);
     }
 
     @Override
@@ -70,13 +70,13 @@ public class Node extends UnicastRemoteObject implements INode {
     }
 
     @Override
-    public void onPlayerPositionChange(IPlayer player, PositionInMaze position) throws RemoteException {
-        user.onPlayerPositionChange(player, position);
-        System.out.println(executor.getQueue().size());
+    public void onPositionStateChange(PositionInMaze position, boolean occupied) throws RemoteException {
+        user.onPositionStateChange(position, occupied);
+
         executor.execute(() -> {
             for (IUser user : users) {
                 try {
-                    user.onPlayerPositionChange(player, position);
+                    user.onPositionStateChange(position, occupied);
                 } catch (RemoteException e) {
                     e.printStackTrace();
                     users.remove(user);
@@ -96,8 +96,8 @@ public class Node extends UnicastRemoteObject implements INode {
     }
 
     @Override
-    public IPlayer[] getPlayers() throws RemoteException {
-        return parentServer.getPlayers();
+    public int[][] getPlayerMap() throws RemoteException {
+        return parentServer.getPlayerMap();
     }
 
     @Override

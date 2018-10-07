@@ -21,7 +21,7 @@ public interface IUser extends Remote {
 
     boolean onLeaseExpired() throws RemoteException;
 
-    void onPlayerPositionChange(IPlayer player, PositionInMaze position) throws RemoteException;
+    void onPositionStateChange(PositionInMaze position, boolean occupied) throws RemoteException;
 
     INode requestNode() throws RemoteException;
 

@@ -9,7 +9,7 @@ public interface IGameServer extends Remote {
 
     BoxMazeInterface getMaze() throws RemoteException;
 
-    IPlayer[] getPlayers() throws RemoteException;
+    int[][] getPlayerMap() throws RemoteException;
 
     void onUserConnected(IUser user) throws RemoteException;
 

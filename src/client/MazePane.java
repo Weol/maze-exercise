@@ -16,9 +16,9 @@ public class MazePane extends Pane {
     private Canvas mazeCanvas;
     private Canvas playerCanvas;
 
-    private Map<?, PositionInMaze> positions;
+    private int[][] positions;
 
-    public MazePane(Box[][] maze, Map<?, PositionInMaze> positions) {
+    public MazePane(Box[][] maze, int[][] positions) {
         this.maze = maze;
         this.positions = positions;
 
@@ -108,11 +108,12 @@ public class MazePane extends Pane {
         int dimension = maze.length;
         int radius = 4;
 
-        for (PositionInMaze position : positions.values()) {
-            int x = position.getXpos() + 1;
-            int y = position.getYpos() + 1;
-
-            g.fillOval(x * w / dimension - w / dimension / 2 - radius / 2, y * h / dimension - h / dimension / 2 - radius / 2, radius, radius);
+        for (int x = 0; x < positions.length; x++) {
+            for (int y = 0; y < positions[x].length; y++) {
+                if (positions[x][y] > 0) {
+                    g.fillOval((x + 1) * w / dimension - w / dimension / 2 - radius / 2, (y + 1) * h / dimension - h / dimension / 2 - radius / 2, radius, radius);
+                }
+            }
         }
     }
 

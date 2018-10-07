@@ -31,7 +31,7 @@ public class Client extends Application {
     private Stage stage;
     private MazePane mazePane;
 
-    private Map<IPlayer, PositionInMaze> players;
+    private int[][] players;
 
     public static void main(String[] args) {
         launch();
@@ -39,7 +39,6 @@ public class Client extends Application {
 
     @Override
     public void start(Stage stage) throws Exception {
-        players = new ConcurrentHashMap<>();
         this.stage = stage;
 
         Registry registry = LocateRegistry.getRegistry(RMIServer.getHostName(), RMIServer.getRMIPort());
@@ -74,6 +73,8 @@ public class Client extends Application {
         @Override
         public void onGameReady(IGameServer gameServer, IPlayer player) throws RemoteException {
             super.onGameReady(gameServer, player);
+
+            players = gameServer.getPlayerMap();
 
             Platform.runLater(() -> {
                 try {
@@ -112,9 +113,16 @@ public class Client extends Application {
         }
 
         @Override
-        public void onPlayerPositionChange(IPlayer player, PositionInMaze position) throws RemoteException {
-            players.put(player, position);
+        public void onPositionStateChange(PositionInMaze position, boolean occupied) throws RemoteException {
+            if (players != null) {
+                if (occupied) {
+                    players[position.getXpos()][position.getYpos()] = 1;
+                } else {
+                    players[position.getXpos()][position.getYpos()] = 0;
+                }
+            }
         }
+
     }
 
 }

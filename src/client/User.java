@@ -18,12 +18,10 @@ public abstract class User extends UnicastRemoteObject implements IUser {
     private IGameServer gameServer;
     private IPlayer player;
 
-    private Set<IPlayer> players;
-
     private Box[][] maze;
 
     protected User() throws RemoteException {
-        players = Collections.synchronizedSet(new HashSet<>());
+
     }
 
     @Override
@@ -32,18 +30,16 @@ public abstract class User extends UnicastRemoteObject implements IUser {
         this.player = player;
 
         this.maze = gameServer.getMaze().getMaze();
-
-        players.addAll(Arrays.asList(gameServer.getPlayers()));
     }
 
     @Override
     public void onPlayerConnected(IPlayer player) throws RemoteException {
-        players.add(player);
+
     }
 
     @Override
     public void onPlayerDisconnected(IPlayer player) throws RemoteException {
-        players.remove(player);
+
     }
 
     @Override
@@ -66,10 +62,6 @@ public abstract class User extends UnicastRemoteObject implements IUser {
 
     public IPlayer getPlayer() throws RemoteException {
         return player;
-    }
-
-    public Set<IPlayer> getPlayers() throws RemoteException {
-        return players;
     }
 
 }

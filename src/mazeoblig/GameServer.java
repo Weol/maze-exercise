@@ -13,7 +13,7 @@ import java.util.concurrent.*;
 
 public class GameServer extends UnicastRemoteObject implements IGameServer {
 
-    private static final int PLAYERS_PER_NODE = 100;
+    private static final int PLAYERS_PER_NODE = 10;
 
     private BoxMaze maze;
 
@@ -21,12 +21,15 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
     private Map<IUser, INode> nodes;
     private INode latestNode;
 
+    private int[][] playerMap;
+
     protected GameServer(int tickrate) throws RemoteException {
         super();
         players = new ConcurrentHashMap<>();
         nodes = new ConcurrentHashMap<>();
 
         maze = new BoxMaze();
+        playerMap = new int[maze.getMaze().length][maze.getMaze().length];
     }
 
     @Override
@@ -96,10 +99,10 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
         }
     }
 
-    public void onPlayerPositionChanged(IPlayer player, PositionInMaze newPosition) {
+    public void onPlayerPositionChanged(PositionInMaze position, boolean occupied) {
         for (INode node : nodes.values()) {
             try {
-                node.onPlayerPositionChange(player, newPosition);
+                node.onPositionStateChange(position, occupied);
             } catch (RemoteException e) {
                 onUserDisconnected(node);
                 e.printStackTrace();
@@ -113,8 +116,8 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
     }
 
     @Override
-    public IPlayer[] getPlayers() {
-        return players.values().toArray(new IPlayer[players.size()]);
+    public int[][] getPlayerMap() throws RemoteException {
+        return playerMap;
     }
 
     public class Player extends UnicastRemoteObject implements IPlayer {
@@ -133,13 +136,19 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
 
         @Override
         public boolean moveTo(PositionInMaze position) throws RemoteException {
-            this.position = position;
-            onPlayerPositionChanged(this, position);
-            return true;
-        }
+            playerMap[this.position.getXpos()][this.position.getYpos()]--;
+            if (playerMap[this.position.getXpos()][this.position.getYpos()] < 1) {
+                onPlayerPositionChanged(this.position, false);
+            }
 
-        public void setPosition(PositionInMaze position) {
+            if (playerMap[position.getXpos()][position.getYpos()] < 1) {
+                onPlayerPositionChanged(position, true);
+            }
+            playerMap[position.getXpos()][position.getYpos()]++;
+
             this.position = position;
+
+            return true;
         }
 
     }

@@ -30,7 +30,7 @@ public class SimulateUsers {
         Registry registry = LocateRegistry.getRegistry(args[0], RMIServer.getRMIPort());
         IUserRegistry userRegistry = (IUserRegistry) registry.lookup(RMIServer.UserRegistryName);
 
-        int count = 200;
+        int count = 2000;
 
         for (int i = 0; i < count; i++) {
             userRegistry.register(new UserImpl());
@@ -84,9 +84,8 @@ public class SimulateUsers {
             readyUsers.add(this);
         }
 
-
         @Override
-        public void onPlayerPositionChange(IPlayer player, PositionInMaze position) throws RemoteException {
+        public void onPositionStateChange(PositionInMaze position, boolean occupied) throws RemoteException {
 
         }
 
