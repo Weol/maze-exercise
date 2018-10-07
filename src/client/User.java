@@ -9,6 +9,7 @@ import simulator.PositionInMaze;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -22,6 +23,7 @@ public abstract class User extends UnicastRemoteObject implements IUser {
     private Box[][] maze;
 
     protected User() throws RemoteException {
+        players = Collections.synchronizedSet(new HashSet<>());
     }
 
     @Override
@@ -31,7 +33,6 @@ public abstract class User extends UnicastRemoteObject implements IUser {
 
         this.maze = gameServer.getMaze().getMaze();
 
-        players = new HashSet<>();
         players.addAll(Arrays.asList(gameServer.getPlayers()));
     }
 

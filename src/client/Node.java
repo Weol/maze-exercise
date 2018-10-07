@@ -8,6 +8,7 @@ import simulator.PositionInMaze;
 
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -21,7 +22,7 @@ public class Node extends UnicastRemoteObject implements INode {
 
     public Node(IUser user) throws RemoteException {
         this.user = user;
-        this.users = new HashSet<>();
+        this.users = Collections.synchronizedSet(new HashSet<>());
     }
 
     @Override
@@ -34,7 +35,12 @@ public class Node extends UnicastRemoteObject implements INode {
     public void onPlayerConnected(IPlayer player) throws RemoteException {
         user.onPlayerConnected(player);
         for (IUser user : users) {
-            user.onPlayerConnected(player);
+            try {
+                user.onPlayerConnected(player);
+            } catch (RemoteException e) {
+                e.printStackTrace();
+                users.remove(user);
+            }
         }
     }
 
@@ -42,7 +48,12 @@ public class Node extends UnicastRemoteObject implements INode {
     public void onPlayerDisconnected(IPlayer player) throws RemoteException {
         user.onPlayerDisconnected(player);
         for (IUser user : users) {
-            user.onPlayerDisconnected(player);
+            try {
+                user.onPlayerDisconnected(player);
+            } catch (RemoteException e) {
+                e.printStackTrace();
+                users.remove(user);
+            }
         }
     }
 
@@ -55,7 +66,12 @@ public class Node extends UnicastRemoteObject implements INode {
     public void onPlayerPositionChange(IPlayer player, PositionInMaze position) throws RemoteException {
         user.onPlayerPositionChange(player, position);
         for (IUser user : users) {
-            user.onPlayerPositionChange(player, position);
+            try {
+                user.onPlayerPositionChange(player, position);
+            } catch (RemoteException e) {
+                e.printStackTrace();
+                users.remove(user);
+            }
         }
     }
 

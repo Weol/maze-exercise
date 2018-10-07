@@ -54,6 +54,24 @@ public class Client extends Application {
         }
 
         @Override
+        public void onPlayerConnected(IPlayer player) throws RemoteException {
+            super.onPlayerConnected(player);
+            System.out.println("New player connected");
+        }
+
+        @Override
+        public void onPlayerDisconnected(IPlayer player) throws RemoteException {
+            super.onPlayerDisconnected(player);
+            System.out.println("A player disconnected");
+        }
+
+        @Override
+        public boolean onLeaseExpired() throws RemoteException {
+            System.out.println("Renewing lease");
+            return super.onLeaseExpired();
+        }
+
+        @Override
         public void onGameReady(IGameServer gameServer, IPlayer player) throws RemoteException {
             super.onGameReady(gameServer, player);
 

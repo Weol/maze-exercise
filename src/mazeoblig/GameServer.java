@@ -58,22 +58,22 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
     }
 
     @Override
-    public void onUserDisconnected(IUser user) throws RemoteException {
+    public void onUserDisconnected(IUser user) {
         if (players.containsKey(user)) {
             IPlayer player = players.get(user);
             players.remove(user);
-
-            if (nodes.containsKey(user)) {
-                throw new IllegalStateException("SHIT! A NODE DISCONNECTED!");
-            }
 
             System.out.println("Client has disconnected");
 
             broadcastPlayerDisconnected(player);
         }
+
+        if (nodes.containsKey(user)) {
+            throw new IllegalStateException("SHIT! A NODE DISCONNECTED!");
+        }
     }
 
-    public void broadcastPlayerConnected(IPlayer player) throws RemoteException  {
+    public void broadcastPlayerConnected(IPlayer player)  {
         for (INode node : nodes.values()) {
             try {
                 node.onPlayerConnected(player);
@@ -84,7 +84,7 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
         }
     }
 
-    public void broadcastPlayerDisconnected(IPlayer player) throws RemoteException {
+    public void broadcastPlayerDisconnected(IPlayer player) {
         for (INode node : nodes.values()) {
             try {
                 node.onPlayerDisconnected(player);
@@ -95,7 +95,7 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
         }
     }
 
-    public void onPlayerPositionChanged(IPlayer player, PositionInMaze newPosition) throws RemoteException {
+    public void onPlayerPositionChanged(IPlayer player, PositionInMaze newPosition) {
         for (INode node : nodes.values()) {
             try {
                 node.onPlayerPositionChange(player, newPosition);

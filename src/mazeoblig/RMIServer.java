@@ -42,6 +42,9 @@ public class RMIServer
   public RMIServer() throws RemoteException, MalformedURLException,
                              NotBoundException, AlreadyBoundException {
     getStaticInfo();
+
+    System.setProperty("java.rmi.server.hostname", myAdress.getHostAddress());
+
     LocateRegistry.createRegistry(PORT);
     System.out.println("RMIRegistry created on host computer " + HOST_NAME + " on port " + Integer.toString(PORT));
 

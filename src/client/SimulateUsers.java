@@ -25,7 +25,9 @@ public class SimulateUsers {
     private static List<UserImpl> readyUsers = new ArrayList<>();
 
     public static void main(String[] args) throws RemoteException, NotBoundException, InterruptedException {
-        Registry registry = LocateRegistry.getRegistry(RMIServer.getHostName(), RMIServer.getRMIPort());
+        System.setProperty("java.rmi.server.hostname", args[1]);
+
+        Registry registry = LocateRegistry.getRegistry(args[0], RMIServer.getRMIPort());
         IUserRegistry userRegistry = (IUserRegistry) registry.lookup(RMIServer.UserRegistryName);
 
         int count = 200;
