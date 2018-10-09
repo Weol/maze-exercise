@@ -2,11 +2,14 @@ package client;
 
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.event.EventHandler;
 import javafx.geometry.Pos;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
@@ -49,7 +52,21 @@ public class Client extends Application {
 
     private class UserImpl extends User {
 
+        private PositionInMaze position;
+
         protected UserImpl() throws RemoteException {
+        }
+
+        private void movePlayer(int dx, int dy) {
+            try {
+                boolean moveSuccessful = getPlayer().moveTo(new PositionInMaze(position.getXpos() + dx, position.getYpos() + dy));
+                if (moveSuccessful) {
+                    position = new PositionInMaze(position.getXpos() + dx, position.getYpos() + dy);
+                    mazePane.setPlayerPosition(position);
+                }
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
         }
 
         @Override
@@ -58,15 +75,37 @@ public class Client extends Application {
 
             players = gameServer.getPlayerMap();
 
+            position = player.getPosition();
+
+            //Run UI operations on the UI thread
             Platform.runLater(() -> {
                 try {
                     mazePane = new MazePane(getMaze(), players);
+                    mazePane.setPlayerPosition(position);
 
                     mazePane.prefHeightProperty().bind(stage.heightProperty());
                     mazePane.prefWidthProperty().bind(stage.widthProperty());
                     mazePane.setVisible(true);
 
-                    stage.setScene(new Scene(mazePane));
+                    Scene scene = new Scene(mazePane);
+                    scene.setOnKeyPressed(event -> {
+                        switch (event.getCode()) {
+                            case UP:
+                                movePlayer(0, -1);
+                                break;
+                            case DOWN:
+                                movePlayer(0, 1);
+                                break;
+                            case LEFT:
+                                movePlayer(-1, 0);
+                                break;
+                            case RIGHT:
+                                movePlayer(1, 0);
+                                break;
+                        }
+                    });
+
+                    stage.setScene(scene);
                     stage.minWidthProperty().set(getMaze().length * 10);
                     stage.minHeightProperty().set(getMaze().length * 10 + 30);
 
@@ -75,23 +114,6 @@ public class Client extends Application {
                     e.printStackTrace();
                 }
             });
-
-            VirtualUser virtualUser = new VirtualUser(getMaze());
-            new Thread(() -> {
-                while (true) {
-                    for (PositionInMaze positionInMaze : virtualUser.getIterationLoop()) {
-                        try {
-                            player.moveTo(positionInMaze);
-                            Thread.sleep(300);
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        mazePane.repaintPositions();
-                    }
-                }
-            }).start();
         }
 
         @Override
@@ -102,6 +124,7 @@ public class Client extends Application {
                 } else {
                     players[position.getXpos()][position.getYpos()] = 0;
                 }
+                mazePane.repaintPositions();
             }
         }
 

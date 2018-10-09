@@ -1,87 +1,112 @@
 package client;
 
-import javafx.application.Platform;
-import javafx.geometry.Pos;
-import javafx.scene.Scene;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.layout.Pane;
 import mazeoblig.*;
+import paramaters.FunctionFlag;
+import paramaters.ParameterInterpretation;
+import paramaters.ParameterInterpreter;
 import simulator.PositionInMaze;
 import simulator.VirtualUser;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class SimulateUsers {
 
-    private static List<UserImpl> readyUsers = new ArrayList<>();
+    private static VirtualUser virtualUser;
+
+    private static ScheduledThreadPoolExecutor scheduledExecutor;
+
+    private static int interval;
 
     public static void main(String[] args) throws RemoteException, NotBoundException, InterruptedException {
-        System.setProperty("java.rmi.server.hostname", args[1]);
+        ParameterInterpreter interpreter = new ParameterInterpreter(
+                new FunctionFlag("host", "h", "The address of the server host", String::new),
+                new FunctionFlag("port", "p", "The port of the host RMI registry", Integer::new),
+                new FunctionFlag("users", "u", "The amount of users to simulate", Integer::new),
+                new FunctionFlag("localhost", "lh", "The outside facing ip of the local machine", String::new),
+                new FunctionFlag("interval", "i", "How long between user movements in milliseconds", Integer::new)
+        );
+        ParameterInterpretation intepretation = interpreter.intepret(args);
 
-        Registry registry = LocateRegistry.getRegistry(args[0], RMIServer.getRMIPort());
-        IGameServer userRegistry = (IGameServer) registry.lookup(RMIServer.GameServerName);
+        String host = intepretation.get("host", getLocalHostAddress());
+        String localhost = intepretation.get("localhost", getLocalHostAddress());
+        int port = intepretation.get("port", RMIServer.getRMIPort());
+        int amountOfUsers = intepretation.get("users", 100);
+        interval = intepretation.get("interval", 1000);
 
-        int count = 2000;
+        System.out.println("Setting local address to " + localhost);
+        System.setProperty("java.rmi.server.hostname", localhost);
 
-        for (int i = 0; i < count; i++) {
-            userRegistry.register(new UserImpl());
+        System.out.println("Locating registry at " + host + ":" + port);
+        Registry registry = LocateRegistry.getRegistry(host, port);
+
+        System.out.println("Fetching game server");
+        IGameServer server = (IGameServer) registry.lookup(RMIServer.GameServerName);
+
+        System.out.println("Creating new scheduled executor with " + Math.min(amountOfUsers / 100, 4) + " threads");
+        scheduledExecutor = new ScheduledThreadPoolExecutor(Math.min(amountOfUsers / 100, 4));
+
+        System.out.println("Registering " + amountOfUsers + " users");
+        for (int i = 0; i < amountOfUsers; i++) {
+            try {
+                server.register(new UserImpl());
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
         }
+    }
 
-        int nThreads = 10;
-        ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(nThreads);
+    public static void onUserReady(UserImpl user) {
+        scheduledExecutor.scheduleWithFixedDelay(() -> {
+            System.out.println(scheduledExecutor.getQueue().size());
+            if (user.moves.size() < 1) {
+                user.moves.addAll(Arrays.asList(virtualUser.getIterationLoop()));
+            }
+            try {
+                user.getPlayer().moveTo(user.moves.poll());
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
+        }, 0, interval, TimeUnit.MILLISECONDS);
+    }
 
-        int usersPerThread = count / nThreads;
-
-        for (int i = 0; i < nThreads; i++) {
-            List<UserImpl> subUsers = readyUsers.subList(i * usersPerThread, Math.min((i+1)*usersPerThread, readyUsers.size()));
-            System.out.printf("Thread %d handles users %d to %d\n", i, i * usersPerThread, Math.min((i+1)*usersPerThread, readyUsers.size()));
-            executor.scheduleWithFixedDelay(() -> {
-                for (UserImpl subUser : subUsers) {
-                    if (subUser.moves.size() != 0) {
-                        try {
-                            subUser.getPlayer().moveTo(subUser.moves.poll());
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
-                        }
-                    } else {
-                        subUser.moves.addAll(subUser.round);
-                    }
-                }
-            }, 1, 1, TimeUnit.SECONDS);
+    private static String getLocalHostAddress() {
+        try {
+            return InetAddress.getLocalHost().getHostAddress();
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
         }
+        return "localhost";
     }
 
     public static class UserImpl extends User {
 
         private Deque<PositionInMaze> moves;
-        private List<PositionInMaze> round;
 
         protected UserImpl() throws RemoteException {
-            moves = new LinkedList<>();
-            round = new ArrayList<>();
+            super();
+            moves = new ArrayDeque<>();
         }
 
         @Override
         public void onGameReady(IGameServer gameServer, IPlayer player) throws RemoteException {
             super.onGameReady(gameServer, player);
 
-            VirtualUser virtualUser = new VirtualUser(getMaze());
+            if (virtualUser == null) {
+                System.out.println("Setting");
+                virtualUser = new VirtualUser(getMaze());
+            }
 
-            moves.addAll(Arrays.asList(virtualUser.getFirstIterationLoop()));
-            round.addAll(Arrays.asList(virtualUser.getIterationLoop()));
+            moves.addAll(Arrays.asList(new VirtualUser(getMaze()).getFirstIterationLoop()));
 
-            moves.addAll(round);
-
-            readyUsers.add(this);
+            onUserReady(this);
         }
 
         @Override

@@ -16,6 +16,8 @@ public class MazePane extends Pane {
     private Canvas mazeCanvas;
     private Canvas playerCanvas;
 
+    private PositionInMaze playerPosition;
+
     private int[][] positions;
 
     public MazePane(Box[][] maze, int[][] positions) {
@@ -54,6 +56,10 @@ public class MazePane extends Pane {
 
         getChildren().add(mazeCanvas);
         getChildren().add(playerCanvas);
+    }
+
+    public void setPlayerPosition(PositionInMaze position) {
+        playerPosition = position;
     }
 
     public void repaintMaze() {
@@ -115,6 +121,14 @@ public class MazePane extends Pane {
                 }
             }
         }
-    }
 
+        //Draw player position last to paint over any other positions
+        if (playerPosition != null) {
+            int x = playerPosition.getXpos();
+            int y = playerPosition.getYpos();
+
+            g.setFill(Color.RED);
+            g.fillOval((x + 1) * w / dimension - w / dimension / 2 - radius / 2, (y + 1) * h / dimension - h / dimension / 2 - radius / 2, radius, radius);
+        }
+    }
 }

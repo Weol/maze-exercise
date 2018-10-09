@@ -6,69 +6,47 @@ import simulator.PositionInMaze;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
-public class GameServer extends UnicastRemoteObject implements IGameServer, INodeManager {
+public class GameServer extends UnicastRemoteObject implements IGameServer {
 
-    private static final int PLAYERS_PER_NODE = 10;
+    private static final int LEASE_SCHEDULER_THREADS = 4;
 
     private BoxMaze maze;
-
-    private HashSet<INode> nodes;
-    private Deque<INode> availableNodes;
-
     private int[][] playerMap;
 
-    protected GameServer(int tickrate) throws RemoteException {
+    private Hashtable<IUser, Player> users;
+
+    private ScheduledThreadPoolExecutor leaseScheduler;
+
+    protected GameServer() throws RemoteException {
         super();
-        nodes = new HashSet<>();
-        availableNodes = new ArrayDeque<>();
 
         maze = new BoxMaze();
         playerMap = new int[maze.getMaze().length][maze.getMaze().length];
+
+        leaseScheduler = new ScheduledThreadPoolExecutor(LEASE_SCHEDULER_THREADS);
     }
 
     @Override
     public void register(IUser user) throws RemoteException {
-        IPlayer player = new Player(new PositionInMaze(0, 0));
+        if (users.containsKey(user)) {
 
-        if (availableNodes.size() < 1) {
-            INode node = user.requestNode();
-            if (node != null) {
-                nodes.add(node);
-            } else {
-                throw new IllegalStateException("A client must accept the responsibility of a node!!!");
-            }
-            availableNodes.addFirst(node);
-            user.onGameReady(this, player);
         } else {
-            INode node = availableNodes.pollLast();
-            availableNodes.addFirst(node);
-            node.acceptUser(user);
+            Player player = new Player(getRandomStartPosition());
+
             user.onGameReady(this, player);
+
+            player.setPosition(player.getPosition());
         }
     }
 
-    public void onNodeDisconnected(INode node) {
-       nodes.remove(node);
-       availableNodes.removeFirstOccurrence(node);
+    private PositionInMaze getRandomStartPosition() {
+        Random rand = new Random();
+        return new PositionInMaze(rand.nextInt(Maze.DIM - 2) + 1, rand.nextInt(Maze.DIM - 2) + 1);
     }
 
-    @Override
-    public void migrateUsers(IUser[] user) {
-
-    }
-
-    @Override
-    public void notifyNodeUnavailable(INode node) {
-        availableNodes.remove(node);
-    }
-
-    @Override
-    public void notifyNodeAvailable(INode node) {
-        availableNodes.addFirst(node);
-    }
-
-    public void broadcast(PositionInMaze position, boolean occupied) {
+    public void broadcastMapStateChanged(PositionInMaze position, boolean occupied) {
         for (INode node : nodes) {
             try {
                 node.onPositionStateChange(position, occupied);
@@ -105,19 +83,22 @@ public class GameServer extends UnicastRemoteObject implements IGameServer, INod
 
         @Override
         public boolean moveTo(PositionInMaze position) throws RemoteException {
+            setPosition(position);
+            return true;
+        }
+
+        public void setPosition(PositionInMaze position) {
             playerMap[this.position.getXpos()][this.position.getYpos()]--;
             if (playerMap[this.position.getXpos()][this.position.getYpos()] < 1) {
-                broadcast(this.position, false);
+                broadcastMapStateChanged(this.position, false);
             }
 
             if (playerMap[position.getXpos()][position.getYpos()] < 1) {
-                broadcast(position, true);
+                broadcastMapStateChanged(position, true);
             }
             playerMap[position.getXpos()][position.getYpos()]++;
 
             this.position = position;
-
-            return true;
         }
 
     }
