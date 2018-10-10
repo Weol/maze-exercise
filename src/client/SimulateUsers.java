@@ -2,6 +2,7 @@ package client;
 
 import mazeoblig.*;
 import paramaters.FunctionFlag;
+import paramaters.ListFlag;
 import paramaters.ParameterInterpretation;
 import paramaters.ParameterInterpreter;
 import simulator.PositionInMaze;
@@ -14,22 +15,32 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.*;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class SimulateUsers {
 
     private static VirtualUser virtualUser;
 
     private static ScheduledThreadPoolExecutor scheduledExecutor;
+    private static Executor executor;
+
+    private static UserImpl[] simulatedUsers;
 
     private static int interval;
+
+    private static final Logger LOGGER = Logger.getLogger(SimulateUsers.class.getName());
 
     public static void main(String[] args) throws RemoteException, NotBoundException, InterruptedException {
         ParameterInterpreter interpreter = new ParameterInterpreter(
                 new FunctionFlag("host", "h", "The address of the server host", String::new),
                 new FunctionFlag("port", "p", "The port of the host RMI registry", Integer::new),
                 new FunctionFlag("users", "u", "The amount of users to simulate", Integer::new),
+                new FunctionFlag("threads", "t", "The amount of threads to use", Integer::new),
                 new FunctionFlag("localhost", "lh", "The outside facing ip of the local machine", String::new),
                 new FunctionFlag("interval", "i", "How long between user movements in milliseconds", Integer::new)
         );
@@ -39,6 +50,7 @@ public class SimulateUsers {
         String localhost = intepretation.get("localhost", getLocalHostAddress());
         int port = intepretation.get("port", RMIServer.getRMIPort());
         int amountOfUsers = intepretation.get("users", 100);
+        int threads = intepretation.get("threads", amountOfUsers / 10);
         interval = intepretation.get("interval", 1000);
 
         System.out.println("Setting local address to " + localhost);
@@ -50,31 +62,43 @@ public class SimulateUsers {
         System.out.println("Fetching game server");
         IGameServer server = (IGameServer) registry.lookup(RMIServer.GameServerName);
 
-        System.out.println("Creating new scheduled executor with " + Math.min(amountOfUsers / 100, 4) + " threads");
-        scheduledExecutor = new ScheduledThreadPoolExecutor(Math.min(amountOfUsers / 100, 4));
+        System.out.println("Creating new thread pool executor executor with " + threads + " threads");
+        executor = Executors.newFixedThreadPool(threads);
+
+        scheduledExecutor = new ScheduledThreadPoolExecutor(1);
+
+        System.out.printf("Movement interval set to %d seconds\n", interval / 1000);
 
         System.out.println("Registering " + amountOfUsers + " users");
+
+        simulatedUsers = new UserImpl[amountOfUsers];
         for (int i = 0; i < amountOfUsers; i++) {
             try {
-                server.register(new UserImpl());
+                server.register(new UserImpl(i));
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
         }
+
+        scheduledExecutor.scheduleWithFixedDelay(() -> {
+            for (UserImpl simulatedUser : simulatedUsers) {
+                executor.execute(() -> {
+                    try {
+                        if (simulatedUser.moves.size() < 1) {
+                            Collections.addAll(simulatedUser.moves, virtualUser.getIterationLoop());
+                        }
+
+                        simulatedUser.getPlayer().moveTo(simulatedUser.moves.poll());
+                    } catch (RemoteException e) {
+                        e.printStackTrace();
+                    }
+                });
+            }
+        }, 0, interval, TimeUnit.MILLISECONDS);
     }
 
     public static void onUserReady(UserImpl user) {
-        scheduledExecutor.scheduleWithFixedDelay(() -> {
-            System.out.println(scheduledExecutor.getQueue().size());
-            if (user.moves.size() < 1) {
-                user.moves.addAll(Arrays.asList(virtualUser.getIterationLoop()));
-            }
-            try {
-                user.getPlayer().moveTo(user.moves.poll());
-            } catch (RemoteException e) {
-                e.printStackTrace();
-            }
-        }, 0, interval, TimeUnit.MILLISECONDS);
+        simulatedUsers[user.index] = user;
     }
 
     private static String getLocalHostAddress() {
@@ -89,9 +113,11 @@ public class SimulateUsers {
     public static class UserImpl extends User {
 
         private Deque<PositionInMaze> moves;
+        private int index;
 
-        protected UserImpl() throws RemoteException {
+        protected UserImpl(int i) throws RemoteException {
             super();
+            index = i;
             moves = new ArrayDeque<>();
         }
 
@@ -100,7 +126,6 @@ public class SimulateUsers {
             super.onGameReady(gameServer, player);
 
             if (virtualUser == null) {
-                System.out.println("Setting");
                 virtualUser = new VirtualUser(getMaze());
             }
 
@@ -110,14 +135,10 @@ public class SimulateUsers {
         }
 
         @Override
-        public void onPositionStateChange(PositionInMaze position, boolean occupied) throws RemoteException {
+        public void onPositionStateChange(List<PositionChange> change) throws RemoteException {
 
         }
 
-        @Override
-        public INode requestNode() throws RemoteException {
-            return new Node(this);
-        }
     }
 
 }

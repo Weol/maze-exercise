@@ -77,7 +77,7 @@ public class ParameterInterpreter {
 				throw new ParamaterException("Missing arguments: " + String.join(", ", missing));
 			}
 		} catch (ParamaterException e) {
-			System.out.println(e.getMessage());
+            System.out.println(e.getMessage());
 			System.exit(1);
 		}
 		
@@ -105,7 +105,6 @@ public class ParameterInterpreter {
 	private void printHelp() {
 		System.out.print("USAGE: ");
 		required.forEach((Flag flag) -> System.out.print("[" + flag.getName().toUpperCase() + "] "));
-		System.out.println();
 		flags.values().stream().distinct().forEach((Flag flag) -> System.out.printf("\t%s%s, %s%s\n\t\t%s\n", prefix, flag.getFlag(), prefix+prefix, flag.getName(), flag.getDescription()));
 		throw new ParamaterException("");
 	}
