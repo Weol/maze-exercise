@@ -4,10 +4,12 @@ import client.Client;
 import client.IUser;
 import simulator.PositionInMaze;
 
+import javax.swing.*;
 import java.io.IOException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
+import java.util.Timer;
 import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,11 +19,6 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
     private static final int LEASE_SCHEDULER_THREADS = 4;
     private static final int LEASE_DURATION = 60;
 
-    private static final int TASK_EXECUTOR_THREADS = 10;
-
-    private static final int TICK_SCHEDULER_THREADS = 4;
-
-
     private BoxMaze maze;
     private Box[][] boxMaze;
     private int[][] playerMap;
@@ -29,8 +26,8 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
     private Map<IUser, Player> users;
 
     private ScheduledThreadPoolExecutor leaseScheduler;
-    private Executor taskExecutor;
-    private ScheduledThreadPoolExecutor tickScheduler;
+    private ThreadPoolExecutor taskExecutor;
+    private ThreadPoolExecutor tickExecutor;
 
     private int[][] previousMap;
 
@@ -45,16 +42,38 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
         previousMap = new int[maze.getMaze().length][maze.getMaze().length];
 
         leaseScheduler = new ScheduledThreadPoolExecutor(LEASE_SCHEDULER_THREADS);
-        tickScheduler = new ScheduledThreadPoolExecutor(TICK_SCHEDULER_THREADS);
-        taskExecutor = Executors.newFixedThreadPool(TASK_EXECUTOR_THREADS);
+        taskExecutor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
+        tickExecutor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
 
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                taskExecutor.execute(() -> tick());
+                tickExecutor.execute(() -> tick());
             }
         }, 1000 / tick, 1000/tick);
+
+        JFrame frame = new JFrame();
+        JList<String> list = new JList<>();
+        list.setSize(frame.getSize());
+        frame.add(list);
+
+        frame.setBounds(0, 0, 300, 300);
+        frame.setAlwaysOnTop(true);
+
+        frame.setVisible(true);
+
+        Timer diagnosticTimer = new Timer();
+        diagnosticTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                list.setListData(new String[] {
+                        "Users connected: " + users.size(),
+                        "Tick executor load: " + tickExecutor.getQueue().size(),
+                        "Task executor load: " + taskExecutor.getQueue().size(),
+                });
+            }
+        }, 1000 / tick, 1000 / tick);
     }
 
     private void tick() {
@@ -112,8 +131,7 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
             try {
                 user.onPositionStateChange(change);
             } catch (RemoteException e) {
-                e.printStackTrace();
-                new Thread(() -> onUserDisconnected(user)).start();
+                taskExecutor.execute(() -> onUserDisconnected(user));
             }
         }
     }

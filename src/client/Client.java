@@ -86,11 +86,24 @@ public class Client extends Application {
         this.stage = stage;
 
         System.out.printf("Fetching registry at %s:%d\n", host, port);
-        Registry registry = LocateRegistry.getRegistry(host, port);
-        IGameServer userRegistry = (IGameServer) registry.lookup(RMIServer.GameServerName);
+        IGameServer gameServer = null;
+
+        for (int i = 0; i < 5; i++) {
+            try {
+                Registry registry = LocateRegistry.getRegistry(host, port);
+                gameServer = (IGameServer) registry.lookup(RMIServer.GameServerName);
+            } catch (RemoteException e) {
+                if (i == 4) {
+                    System.out.println("Failed to connect to game server, giving up.");
+                    e.printStackTrace();
+                } else {
+                    System.out.println("Failed to connect to game server, retrying in 1 seconds");
+                }
+            }
+        }
 
         System.out.printf("Registering client\n", host, port);
-        userRegistry.register(new UserImpl());
+        gameServer.register(new UserImpl());
     }
 
     @Override
@@ -126,7 +139,7 @@ public class Client extends Application {
             System.out.printf("Fetching map of players\n");
             players = gameServer.getPlayerMap();
 
-            System.out.printf("Fetchingg local players position\n");
+            System.out.printf("Fetching local players position\n");
             position = player.getPosition();
 
             //Run UI operations on the UI thread
@@ -182,13 +195,9 @@ public class Client extends Application {
         @Override
         public void onPositionStateChange(List<PositionChange> change) throws RemoteException {
             if (players != null) {
-                System.out.println("---- " + change.size() + " changes ----");
                 for (PositionChange positionChange : change) {
-                    System.out.printf("(%d, %d): %d\n", positionChange.x, positionChange.y, positionChange.diff);
                     players[positionChange.x][positionChange.y] += positionChange.diff;
                 }
-            } else {
-                System.out.println("Players is null");
             }
         }
 
