@@ -90,7 +90,9 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
         }
         previousMap = mapState;
 
-        broadcastMapStateChanged(delta);
+        if (delta.size() > 0) {
+            broadcastMapStateChanged(delta);
+        }
     }
 
     @Override
