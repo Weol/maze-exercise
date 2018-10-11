@@ -1,5 +1,6 @@
 package client;
 
+import javafx.geometry.Pos;
 import mazeoblig.*;
 import paramaters.FunctionFlag;
 import paramaters.ListFlag;
@@ -50,7 +51,7 @@ public class SimulateUsers {
         String localhost = intepretation.get("localhost", getLocalHostAddress());
         int port = intepretation.get("port", RMIServer.getRMIPort());
         int amountOfUsers = intepretation.get("users", 100);
-        int threads = intepretation.get("threads", amountOfUsers / 10);
+        int threads = intepretation.get("threads", Math.max(amountOfUsers / 10, 1));
         interval = intepretation.get("interval", 1000);
 
         System.out.println("Setting local address to " + localhost);
@@ -88,7 +89,10 @@ public class SimulateUsers {
                             Collections.addAll(simulatedUser.moves, virtualUser.getIterationLoop());
                         }
 
-                        simulatedUser.getPlayer().moveTo(simulatedUser.moves.poll());
+                        boolean moveSucessful = simulatedUser.getPlayer().moveTo(simulatedUser.moves.peek());
+                        if (moveSucessful) {
+                            simulatedUser.moves.poll();
+                        }
                     } catch (RemoteException e) {
                         e.printStackTrace();
                     }
@@ -125,11 +129,13 @@ public class SimulateUsers {
         public void onGameReady(IGameServer gameServer, IPlayer player) throws RemoteException {
             super.onGameReady(gameServer, player);
 
+            PositionInMaze position = player.getPosition();
+
             if (virtualUser == null) {
                 virtualUser = new VirtualUser(getMaze());
             }
 
-            moves.addAll(Arrays.asList(new VirtualUser(getMaze()).getFirstIterationLoop()));
+            moves.addAll(Arrays.asList(new VirtualUser(getMaze(), position.getXpos(), position.getYpos()).getFirstIterationLoop()));
 
             onUserReady(this);
         }

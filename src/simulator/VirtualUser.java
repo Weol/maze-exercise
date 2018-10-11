@@ -49,6 +49,24 @@ public class VirtualUser {
 		dim = maze[0].length;
 		init();
 	}
+
+    /**
+     * Konstrukt�r som i tilegg setter in initiell posisjon
+     * @param maze
+     */
+    public VirtualUser(Box[][] maze, int x, int y) {
+        this.maze = maze;
+        dim = maze[0].length;
+
+        xp = x;
+        yp = y;
+
+        // L�ser veien ut av labyrinten basert p� tilfeldig inngang ...
+        makeFirstIteration();
+        // og deretter l�ses labyrinten basert p� inngang fra starten
+        makeNextIteration();
+    }
+
 	/**
 	 * Initsierer en tilfeldig posisjon i labyrint
 	 */

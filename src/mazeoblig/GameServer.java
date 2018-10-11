@@ -23,6 +23,7 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
 
 
     private BoxMaze maze;
+    private Box[][] boxMaze;
     private int[][] playerMap;
 
     private Map<IUser, Player> users;
@@ -39,6 +40,7 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
         users = new ConcurrentHashMap<>();
 
         maze = new BoxMaze();
+        boxMaze = maze.getMaze();
         playerMap = new int[maze.getMaze().length][maze.getMaze().length];
         previousMap = new int[maze.getMaze().length][maze.getMaze().length];
 
@@ -78,7 +80,7 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
             System.out.println("A user tried to register twice");
             user.onGameReady(this, users.get(user));
         } else {
-            Lease lease = new Lease(user, LEASE_DURATION);
+            new Lease(user, LEASE_DURATION);
 
             Player player = new Player(getRandomStartPosition());
             System.out.printf("New player connected, placing them at (%d, %d)\n", player.getPosition().getXpos(), player.getPosition().getYpos());
@@ -142,22 +144,33 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
 
         @Override
         public boolean moveTo(PositionInMaze position) throws RemoteException {
+            if (position.getYpos() < 0 || position.getXpos() < 0 || position.getXpos() > boxMaze.length - 1 || position.getYpos() > boxMaze.length - 1) {
+                return false;
+            }
+
+            int deltaX = this.position.getXpos() - position.getXpos();
+            int deltaY = this.position.getYpos() - position.getYpos();
+            if (Math.abs(deltaX) + Math.abs(deltaY) > 1) {
+                return false;
+            }
+
+            Box box = boxMaze[this.position.getXpos()][this.position.getYpos()];
+            if (deltaX == -1 && box.getRight() == null) {
+                return false;
+            } else if (deltaX == 1 && box.getLeft() == null) {
+                return false;
+            } else if (deltaY == -1 && box.getDown() == null) {
+                return false;
+            } else if (deltaY == 1 && box.getUp() == null) {
+                return false;
+            }
+
             setPosition(position);
             return true;
         }
 
         public void setPosition(PositionInMaze position) {
             playerMap[this.position.getXpos()][this.position.getYpos()]--;
-            /**
-            if (playerMap[this.position.getXpos()][this.position.getYpos()] < 1) {
-                broadcastMapStateChanged(this.position, false);
-            }
-
-
-            if (playerMap[position.getXpos()][position.getYpos()] < 1) {
-                broadcastMapStateChanged(position, true);
-            }
-             **/
             playerMap[position.getXpos()][position.getYpos()]++;
 
             this.position = position;
