@@ -48,7 +48,7 @@ public class RMIServer
             NotBoundException, AlreadyBoundException {
         getStaticInfo();
 
-        System.setProperty("java.rmi.server.hostname", "158.39.52.120");
+        System.setProperty("java.rmi.server.hostname", "172.16.0.8");
 
         LocateRegistry.createRegistry(PORT);
         System.out.println("RMIRegistry created on host computer " + HOST_NAME + " on port " + Integer.toString(PORT));

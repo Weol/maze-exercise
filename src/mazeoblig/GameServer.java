@@ -16,21 +16,28 @@ import java.util.logging.Logger;
 
 public class GameServer extends UnicastRemoteObject implements IGameServer {
 
-    private static final int LEASE_SCHEDULER_THREADS = 4;
-    private static final int LEASE_DURATION = 60;
+    private static final int LEASE_SCHEDULER_THREADS = 4; //The amount of threads the lease scheduler should use
+    private static final int LEASE_DURATION = 60; //How many seconds a lease is valid for
 
-    private BoxMaze maze;
-    private Box[][] boxMaze;
-    private int[][] playerMap;
+    private BoxMaze maze; //The maze that the server uses
+    private Box[][] boxMaze; //The Box[][] representation of the maze that the server uses, only for internal use
+    private int[][] playerMap; //The map of how many players are in any (x, y) point in the maze, same size as {@link #boxMaze}
 
-    private Map<IUser, Player> users;
+    private Map<IUser, Player> users; //A map that maps a IUser to their corresponding Player instance
 
-    private ScheduledThreadPoolExecutor leaseScheduler;
-    private ThreadPoolExecutor taskExecutor;
-    private ThreadPoolExecutor tickExecutor;
+    private ScheduledThreadPoolExecutor leaseScheduler; //The executor that schedules lease expriry
+    private Executor taskExecutor; //An executor used for varius async tasks
+    private Executor tickExecutor; //The executor used to run the servers tick {@link GameServer#tick}
 
-    private int[][] previousMap;
+    private int[][] previousMap; //A copy of {@link #playerMap} from the previous tick, used to track changes
 
+    /**
+     * Constructs a new GameServer with a specific tickrate that decides how many timer per second the server should
+     * update its users about changes since the last tick
+     *
+     * @param tick how many timer per second to update users
+     * @throws RemoteException
+     */
     protected GameServer(int tick) throws RemoteException {
         super();
 
@@ -42,8 +49,8 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
         previousMap = new int[maze.getMaze().length][maze.getMaze().length];
 
         leaseScheduler = new ScheduledThreadPoolExecutor(LEASE_SCHEDULER_THREADS);
-        taskExecutor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
-        tickExecutor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
+        taskExecutor = Executors.newCachedThreadPool();
+        tickExecutor = Executors.newCachedThreadPool();
 
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {
@@ -52,45 +59,31 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
                 tickExecutor.execute(() -> tick());
             }
         }, 1000 / tick, 1000/tick);
-
-        JFrame frame = new JFrame();
-        JList<String> list = new JList<>();
-        list.setSize(frame.getSize());
-        frame.add(list);
-
-        frame.setBounds(0, 0, 300, 300);
-        frame.setAlwaysOnTop(true);
-
-        frame.setVisible(true);
-
-        Timer diagnosticTimer = new Timer();
-        diagnosticTimer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                list.setListData(new String[] {
-                        "Users connected: " + users.size(),
-                        "Tick executor load: " + tickExecutor.getQueue().size(),
-                        "Task executor load: " + taskExecutor.getQueue().size(),
-                });
-            }
-        }, 1000 / tick, 1000 / tick);
     }
 
+    /**
+     * Compares {@link #playerMap} with {@link #previousMap} and updates all clients about the difference. Then it
+     * copies {@link #playerMap} into {@link #previousMap} in preperation for the next time this method is called.
+     *
+     * It uses a list of {@link PositionChange} objects to notify the clients about changes.
+     */
     private void tick() {
         int[][] mapState = Arrays.stream(playerMap).map(int[]::clone).toArray(int[][]::new);
 
+        //The size of this list will never exceed its initial capacity
         List<PositionChange> delta = new ArrayList<>(mapState.length * mapState.length);
+
         for (int x = 0; x < mapState.length; x++) {
             for (int y = 0; y < mapState[x].length; y++) {
-                int diff = mapState[x][y] - previousMap[x][y];
+                int diff = mapState[x][y] - previousMap[x][y]; //Calculate the difference
                 if (diff != 0) {
-                    delta.add(new PositionChange(x, y, diff));
+                    delta.add(new PositionChange(x, y, diff)); //If there is a difference, add it to the list
                 }
             }
         }
         previousMap = mapState;
 
-        if (delta.size() > 0) {
+        if (delta.size() > 0) { //Dont bother sending an empty list
             broadcastMapStateChanged(delta);
         }
     }
