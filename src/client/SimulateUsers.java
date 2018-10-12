@@ -141,7 +141,7 @@ public class SimulateUsers {
         }
 
         @Override
-        public void onPositionStateChange(List<PositionChange> change) throws RemoteException {
+        public void onPositionStateChange(PositionChange change) throws RemoteException {
 
         }
 

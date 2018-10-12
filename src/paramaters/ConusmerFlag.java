@@ -4,7 +4,7 @@ import java.util.function.Consumer;
 
 /**
  * A flag that accepts a string argument and calls a {@link Consumer<String>} with the argument. It will not produce
- * any value that can be retrieved by {@link ParamaterIntepretation#get}.
+ * any value that can be retrieved by {@link ParameterInterpretation#get}.
  */
 public class ConusmerFlag extends Flag<String> {
 

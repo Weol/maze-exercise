@@ -86,21 +86,9 @@ public class Client extends Application {
         this.stage = stage;
 
         System.out.printf("Fetching registry at %s:%d\n", host, port);
-        IGameServer gameServer = null;
 
-        for (int i = 0; i < 5; i++) {
-            try {
-                Registry registry = LocateRegistry.getRegistry(host, port);
-                gameServer = (IGameServer) registry.lookup(RMIServer.GameServerName);
-            } catch (RemoteException e) {
-                if (i == 4) {
-                    System.out.println("Failed to connect to game server, giving up.");
-                    e.printStackTrace();
-                } else {
-                    System.out.println("Failed to connect to game server, retrying in 1 seconds");
-                }
-            }
-        }
+        Registry registry = LocateRegistry.getRegistry(host, port);
+        IGameServer gameServer = (IGameServer) registry.lookup(RMIServer.GameServerName);
 
         System.out.printf("Registering client\n", host, port);
         gameServer.register(new UserImpl());
@@ -193,10 +181,11 @@ public class Client extends Application {
         }
 
         @Override
-        public void onPositionStateChange(List<PositionChange> change) throws RemoteException {
+        public void onPositionStateChange(PositionChange change) throws RemoteException {
             if (players != null) {
-                for (PositionChange positionChange : change) {
-                    players[positionChange.x][positionChange.y] += positionChange.diff;
+                for (int i = 0; i < change.size(); i++) {
+                    int[] entry = change.get(i);
+                    players[entry[0]][entry[1]] += entry[2];
                 }
             }
         }
