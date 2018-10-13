@@ -76,29 +76,6 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
                 }
             }
         }, 0, 1000 / rate);
-
-        JFrame frame = new JFrame("Server");
-        frame.setBounds(0,0, 200,200);
-
-        JList list = new JList();
-
-        frame.add(list);
-
-        frame.setVisible(true);
-        frame.setAlwaysOnTop(true);
-
-        Timer s = new Timer();
-        s.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                list.setListData(new String[] {
-                        "Users: " + users.size(),
-                        "Task queue: " + taskExecutor.getQueue().size(),
-                        "Timeouts: " + timeOutScheduler.getQueue().size(),
-                        "Active tasks: " + taskExecutor.getActiveCount(),
-                });
-            }
-        }, 100, 100);
     }
 
     /**

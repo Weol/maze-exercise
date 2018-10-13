@@ -25,7 +25,7 @@ public class BoxMaze extends UnicastRemoteObject implements BoxMazeInterface
 {
     private int maze[][];
     protected Box boxmaze[][];
-    private int size = 100;
+    private int size = 50;
     /**
      * Konstrukt�r
      * Randomiserer opp en tilfeldig labyrint p� 20 x 20 bokser hvor veggene
