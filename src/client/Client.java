@@ -41,16 +41,17 @@ import java.util.logging.Logger;
 
 public class Client extends Application {
 
-    private Stage stage;
-    private MazePane mazePane;
+    private Stage stage; //The stage (window)
+    private MazePane mazePane; //The pane that draws the maze and all the players
 
+    //The map representing how many players are at all points of the maze of the server this client is connected to
     private int[][] players;
 
     //Parameters
-    private static String host;
-    private static String localhost;
-    private static int port;
-    private static int refreshRate;
+    private static String host; //The address of the host
+    private static String localhost; //The address of this client
+    private static int port; //The port of the RMI registry
+    private static int refreshRate; //The refresh rate (fps) of this client
 
     public static void main(String[] args) {
         ParameterInterpreter interpreter = new ParameterInterpreter(
@@ -72,6 +73,9 @@ public class Client extends Application {
         launch();
     }
 
+    /**
+     * @return the local address, or "localhost" if we failed
+     */
     private static String getLocalHostAddress() {
         try {
             return InetAddress.getLocalHost().getHostAddress();
@@ -90,22 +94,23 @@ public class Client extends Application {
         Registry registry = LocateRegistry.getRegistry(host, port);
         IGameServer gameServer = (IGameServer) registry.lookup(RMIServer.GameServerName);
 
-        System.out.printf("Registering client\n", host, port);
+        System.out.printf("Registering client\n");
         gameServer.register(new UserImpl());
-    }
-
-    @Override
-    public void stop() throws Exception {
-        super.stop();
     }
 
     private class UserImpl extends User {
 
-        private PositionInMaze position;
+        private PositionInMaze position; //The position of the player that belongs to this client
 
         protected UserImpl() throws RemoteException {
         }
 
+        /**
+         * Attempts to move
+         *
+         * @param dx
+         * @param dy
+         */
         private void movePlayer(int dx, int dy) {
             try {
                 boolean moveSuccessful = getPlayer().moveTo(new PositionInMaze(position.getXpos() + dx, position.getYpos() + dy));
@@ -180,6 +185,12 @@ public class Client extends Application {
             });
         }
 
+        /**
+         *
+         *
+         * @param change
+         * @throws RemoteException
+         */
         @Override
         public void onPositionStateChange(PositionChange change) throws RemoteException {
             if (players != null) {

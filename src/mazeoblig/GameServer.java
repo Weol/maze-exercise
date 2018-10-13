@@ -129,11 +129,11 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
      * @param user the user that has disconnected
      */
     private void onUserDisconnected(IUser user) {
-        System.out.println("A user has disconnected");
-
         if (users.containsKey(user)) {
             Player player = users.remove(user);
             player.purge();
+
+            System.out.println("A user has disconnected");
         }
     }
 
@@ -329,7 +329,7 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
          * Releases this lease by not renewing it and calls {@link #onUserDisconnected} to disconnect {@link #user}
          */
         public void release() {
-            //onUserDisconnected(user);
+            onUserDisconnected(user);
         }
 
     }
