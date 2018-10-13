@@ -42,7 +42,6 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
      * update its users about changes since the last tick
      *
      * @param rate how many timer per second to update users
-
      */
     protected GameServer(int rate) throws RemoteException {
         super();
@@ -202,8 +201,8 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
      * {@link Timeout#TIMED_OUT}, causing this method to ignore the user until their {@link Player#timeOut} is set to
      * {@link Timeout#RECENTLY_TIMED_OUT} by {@link #timeOutScheduler} after {@link #TIMEOUT_DELAY} seconds. If a
      * {@link RemoteException} is thrown again then that user will be disconnected by calling {@link #disconnect}. If a
-     * {@link RemoteException} is not thrown then the players {@link Player#timeOut} will be reset to
-     * {@link Timeout#NOT_TIMED_OUT}.
+     * {@link RemoteException} is not thrown then the player's {@link Player#timeOut} will be reset to
+     * {@link Timeout#NOT_TIMED_OUT} and {@link IUser#invalidateMap()} is called on that user.
      *
      * @param change the changes since last tick
      */
@@ -224,7 +223,7 @@ public class GameServer extends UnicastRemoteObject implements IGameServer {
                         if (player.timeOut == Timeout.NOT_TIMED_OUT) { //Check if this is their first time timing out
                             player.timeOut = Timeout.TIMED_OUT;
                             timeOutScheduler.schedule(() -> player.timeOut = Timeout.RECENTLY_TIMED_OUT, TIMEOUT_DELAY, TimeUnit.SECONDS); //Give a second chance
-                        } else if (player.timeOut == Timeout.RECENTLY_TIMED_OUT) { //Check if this is their seconds chance
+                        } else if (player.timeOut == Timeout.RECENTLY_TIMED_OUT) { //Check if this is their second chance
                             disconnect(user);
                         }
                     }
