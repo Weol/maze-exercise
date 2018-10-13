@@ -11,7 +11,6 @@ public interface IPlayer extends Remote {
      * Should return the position of the player
      *
      * @return the position of the player
-     * @throws RemoteException
      */
     PositionInMaze getPosition() throws RemoteException;
 
@@ -21,7 +20,6 @@ public interface IPlayer extends Remote {
      *
      * @param position the position to attempt to move to
      * @return whether or not the move was successful or not
-     * @throws RemoteException
      */
     boolean moveTo(PositionInMaze position) throws RemoteException;
 

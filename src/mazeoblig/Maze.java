@@ -1,8 +1,5 @@
 package mazeoblig;
 
-import client.IUser;
-import simulator.PositionInMaze;
-
 import java.awt.*;
 import java.applet.*;
 
@@ -21,11 +18,6 @@ import java.applet.*;
  */
 import java.rmi.RemoteException;
 import java.rmi.NotBoundException;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Hashtable;
-import java.util.Set;
-
 /**
  * Tegner opp maze i en applet, basert p� definisjon som man finner p� RMIServer
  * RMIServer p� sin side  henter st�rrelsen fra definisjonen i Maze
@@ -36,11 +28,9 @@ import java.util.Set;
 public class Maze extends Applet {
 
 	private BoxMazeInterface bm;
-	public Box[][] maze;
-	public static int DIM = 50;
+	private Box[][] maze;
+	public static int DIM = 10;
 	private int dim = DIM;
-
-    public Hashtable<IUser, PositionInMaze> positions;
 
 	static int xp;
 	static int yp;
@@ -55,7 +45,6 @@ public class Maze extends Applet {
 	 */
 	public void init() {
 		int size = dim;
-
 		/*
 		 ** Kobler opp mot RMIServer, under forutsetning av at disse
 		 ** kj�rer p� samme maskin. Hvis ikke m� oppkoblingen
@@ -63,7 +52,7 @@ public class Maze extends Applet {
 		 */
 		if (server_hostname == null)
 			server_hostname = RMIServer.getHostName();
-        if (server_portnumber == 0)
+		if (server_portnumber == 0)
 			server_portnumber = RMIServer.getRMIPort();
 		try {
 			java.rmi.registry.Registry r = java.rmi.registry.LocateRegistry.
@@ -73,6 +62,7 @@ public class Maze extends Applet {
 			/*
 			 ** Henter inn referansen til Labyrinten (ROR)
 			 */
+			bm = (BoxMazeInterface) r.lookup(RMIServer.MazeName);
 			maze = bm.getMaze();
 			
 /*
@@ -95,6 +85,17 @@ public class Maze extends Applet {
 			System.err.println("Remote Exception: " + e.getMessage());
 			System.exit(0);
 		}
+		catch (NotBoundException f) {
+			/*
+			 ** En exception her er en indikasjon p� at man ved oppslag (lookup())
+			 ** ikke finner det objektet som man s�ker.
+			 ** �rsaken til at dette skjer kan v�re mange, men v�r oppmerksom p�
+			 ** at hvis hostname ikke er OK (RMIServer gir da feilmelding under
+			 ** oppstart) kan v�re en �rsak.
+			 */
+			System.err.println("Not Bound Exception: " + f.getMessage());
+			System.exit(0);
+		}
 	}
 
 	//Get a parameter value
@@ -108,7 +109,7 @@ public class Maze extends Applet {
 
 	//Get parameter info
 	public String[][] getParameterInfo() {
-		java.lang.String[][] pinfo = { {"Size", "int", ""},
+		String[][] pinfo = { {"Size", "int", ""},
 		};
 		return pinfo;
 	}
@@ -120,13 +121,7 @@ public class Maze extends Applet {
 	public void paint (Graphics g) {
 		int x, y;
 
-
 		// Tegner baser p� box-definisjonene ....
-        if (positions != null) {
-            for (PositionInMaze position : positions.values()) {
-                g.drawOval(position.getXpos() * 10 - 2 + 5, position.getYpos() * 10 - 2 + 5, 4, 4);
-            }
-        }
 
 		for (x = 1; x < (dim - 1); ++x)
 			for (y = 1; y < (dim - 1); ++y) {

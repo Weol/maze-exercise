@@ -2,42 +2,22 @@ package client;
 
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.event.EventHandler;
-import javafx.geometry.Pos;
-import javafx.scene.Group;
 import javafx.scene.Scene;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyEvent;
-import javafx.scene.layout.Pane;
-import javafx.scene.layout.StackPane;
-import javafx.scene.paint.Color;
 import javafx.stage.Stage;
-import javafx.stage.WindowEvent;
 import mazeoblig.*;
-import mazeoblig.Box;
 import paramaters.FunctionFlag;
 import paramaters.ParameterInterpretation;
 import paramaters.ParameterInterpreter;
 import simulator.PositionInMaze;
-import simulator.VirtualUser;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.rmi.Naming;
-import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
-import java.util.Timer;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class Client extends Application {
 
@@ -47,12 +27,21 @@ public class Client extends Application {
     //The map representing how many players are at all points of the maze of the server this client is connected to
     private int[][] players;
 
+    //An identifier that identifies which MapChangeEvent this client last processed
+    private long tickIndex;
+
+    //The pending MapChangeEvents that have arrived out of order and is waiting for their index
+    private SortedSet<MapChangeEvent> pendingChanges;
+
     //Parameters
     private static String host; //The address of the host
     private static String localhost; //The address of this client
     private static int port; //The port of the RMI registry
     private static int refreshRate; //The refresh rate (fps) of this client
 
+    /**
+     * Interprets the parameters and launches the JavaFX application
+     */
     public static void main(String[] args) {
         ParameterInterpreter interpreter = new ParameterInterpreter(
                 new FunctionFlag("host", "h", "The address of the server host", String::new),
@@ -62,10 +51,10 @@ public class Client extends Application {
         );
         ParameterInterpretation intepretation = interpreter.intepret(args);
 
-        host = intepretation.get("host", getLocalHostAddress());
-        localhost = intepretation.get("localhost", getLocalHostAddress());
-        port = intepretation.get("port", RMIServer.getRMIPort());
-        refreshRate = intepretation.get("rate", 30);
+        host = intepretation.get("host", getLocalHostAddress()); //Set host to the host argument or local host
+        localhost = intepretation.get("localhost", getLocalHostAddress()); //Set localhost to the localhost argument or local host
+        port = intepretation.get("port", RMIServer.getRMIPort()); //Set port to the port argument or RMIServer.getRMIPort()
+        refreshRate = intepretation.get("rate", 12); //Sets the refresh rate of the canvas to the rate argument or 12
 
         System.out.println("Setting local address to " + localhost);
         System.setProperty("java.rmi.server.hostname", localhost);
@@ -85,9 +74,14 @@ public class Client extends Application {
         return "localhost";
     }
 
+    /**
+     * Called by JavaFX to start the application (window)
+     */
     @Override
     public void start(Stage stage) throws Exception {
         this.stage = stage;
+
+        pendingChanges = new TreeSet<>(Comparator.comparingLong(MapChangeEvent::getIndex));
 
         System.out.printf("Fetching registry at %s:%d\n", host, port);
 
@@ -98,6 +92,9 @@ public class Client extends Application {
         gameServer.register(new UserImpl());
     }
 
+    /**
+     * An implementation of {@link IUser} using the abstract class {@link User} for convenience
+     */
     private class UserImpl extends User {
 
         private PositionInMaze position; //The position of the player that belongs to this client
@@ -106,10 +103,12 @@ public class Client extends Application {
         }
 
         /**
-         * Attempts to move
+         * Attempts to move this client's player in a x and y direction, if them movement is not successful then
+         * {@link #position} will not be changed. If it is then {@link #position} will be updated and
+         * {@link MazePane#setPlayerPosition} will be called on {@link #mazePane} to update the players position.
          *
-         * @param dx
-         * @param dy
+         * @param dx the x direction of the move
+         * @param dy the y direction of the move
          */
         private void movePlayer(int dx, int dy) {
             try {
@@ -123,6 +122,13 @@ public class Client extends Application {
             }
         }
 
+        /**
+         * Called after {@link IGameServer#register} to signal that this clients player is ready.
+         *
+         * @param gameServer the gameserver
+         * @param player this clients player
+         * @throws RemoteException
+         */
         @Override
         public void onGameReady(IGameServer gameServer, IPlayer player) throws RemoteException {
             super.onGameReady(gameServer, player);
@@ -130,7 +136,9 @@ public class Client extends Application {
             System.out.printf("Game is ready\n");
 
             System.out.printf("Fetching map of players\n");
-            players = gameServer.getPlayerMap();
+            PlayerMap map = gameServer.getPlayerMap();
+            tickIndex = map.getIndex(); //Sets the maps tickIndex so we can synchronize MapChangeEvents
+            players = map.getMap();
 
             System.out.printf("Fetching local players position\n");
             position = player.getPosition();
@@ -166,9 +174,11 @@ public class Client extends Application {
                     });
 
                     stage.setScene(scene);
+
                     stage.minWidthProperty().set(getMaze().length * 10);
                     stage.minHeightProperty().set(getMaze().length * 10 + 30);
 
+                    //Exit application when window is closed
                     stage.setOnCloseRequest(t -> {
                         Platform.exit();
                         System.exit(0);
@@ -177,7 +187,8 @@ public class Client extends Application {
                     stage.show();
 
                     System.out.printf("Starting maze render at %d refresh rate\n", refreshRate);
-                    ScheduledThreadPoolExecutor refreshExecutor = new ScheduledThreadPoolExecutor(2);
+                    ScheduledThreadPoolExecutor refreshExecutor = new ScheduledThreadPoolExecutor(1);
+
                     refreshExecutor.scheduleAtFixedRate(mazePane::repaintPositions, 0, 1000 / refreshRate, TimeUnit.MILLISECONDS);
                 } catch (RemoteException e) {
                     e.printStackTrace();
@@ -186,19 +197,56 @@ public class Client extends Application {
         }
 
         /**
+         * Called by the game server to notify that one or more players have moved. It checks if the MapChangeEvents
+         * index is equal to {@link #tickIndex} + 1, if it is then we iterate through the changes and change
+         * {@link #players} accordingly, and increment {@link #tickIndex} in anticipation of the next call to this
+         * method. After that we check if there are any pending MapChangeEvents that should be applied as well; if there
+         * is a pending MapChangeEvent with index equal to {@link #tickIndex} + 1 after we incremented, then it means
+         * that a MapChangeEvent was received out of order and was stored until its predecessor arrived.
          *
+         * If the MapChangeEvent's index does not equal {@link #tickIndex} + 1, but is greater, then it means that the
+         * MapChangeEvent arrived out of order and is stored in {@link #pendingChanges} until its time for it
+         * to be applied.
          *
-         * @param change
-         * @throws RemoteException
+         * If the MapChangeEvent's index is less than {@link #tickIndex} + 1 then it means we've received the same
+         * MapChangeEvent twice, or we have received a MapChangeEvent that precedes our initial fetch of the servers
+         * player map.
          */
         @Override
-        public void onPositionStateChange(PositionChange change) throws RemoteException {
+        public synchronized void onPlayerMapChange(MapChangeEvent change) throws RemoteException {
             if (players != null) {
-                for (int i = 0; i < change.size(); i++) {
-                    int[] entry = change.get(i);
-                    players[entry[0]][entry[1]] += entry[2];
+                if (change.getIndex() == tickIndex + 1) { //Check if the MapChangeEvent is the one we're waiting for
+                    for (int i = 0; i < change.size(); i++) { //Loop through the changes
+                        int[] entry = change.get(i);
+                        players[entry[0]][entry[1]] += entry[2]; //Apply the change
+                    }
+                    tickIndex++;
+
+                    if (pendingChanges.size() > 0) {
+                        MapChangeEvent pending = pendingChanges.first();
+                        if (pending.getIndex() == tickIndex + 1) { //Check if the pending change should be applied
+                            pendingChanges.remove(pending);
+                            onPlayerMapChange(pending); //Apply the pending change
+                        }
+                    }
+                } else if (change.getIndex() > tickIndex + 1) { //Check if we need to save this change for later
+                    pendingChanges.add(change);
                 }
             }
+        }
+
+        /**
+         * Called by the server to notify that this clients map is probably faulty. Empties {@link #pendingChanges} and
+         * request a new map from the server.
+         */
+        @Override
+        public void invalidateMap() throws RemoteException {
+            players = null; //To stop {@link #onPlayerMapChange} to run while we fetch a the map
+
+            pendingChanges.clear();
+            PlayerMap map = getGameServer().getPlayerMap();
+            tickIndex = map.getIndex();
+            players = map.getMap();
         }
 
     }

@@ -1,6 +1,7 @@
 package simulator;
 
 import mazeoblig.Box;
+import mazeoblig.BoxMazeInterface;
 
 import java.util.Random;
 import java.util.Stack;

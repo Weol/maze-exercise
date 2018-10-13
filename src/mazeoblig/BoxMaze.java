@@ -24,8 +24,8 @@ import java.rmi.RemoteException;
 public class BoxMaze extends UnicastRemoteObject implements BoxMazeInterface
 {
     private int maze[][];
-    private Box boxmaze[][];
-    private int size = 50;
+    protected Box boxmaze[][];
+    private int size = 100;
     /**
      * Konstrukt�r
      * Randomiserer opp en tilfeldig labyrint p� 20 x 20 bokser hvor veggene

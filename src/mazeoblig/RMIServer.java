@@ -42,18 +42,17 @@ public class RMIServer
     private static RMIServer rmi;
 
     private static IGameServer gameServer;
+    public static String MazeName = "Maze";
     public static String GameServerName = "GameServer";
 
-    public RMIServer() throws RemoteException, MalformedURLException,
+    public RMIServer(String[] args) throws RemoteException, MalformedURLException,
             NotBoundException, AlreadyBoundException {
         getStaticInfo();
-
-        System.setProperty("java.rmi.server.hostname", "172.16.0.6");
 
         LocateRegistry.createRegistry(PORT);
         System.out.println("RMIRegistry created on host computer " + HOST_NAME + " on port " + Integer.toString(PORT));
 
-        IGameServer gameServer = new GameServer(16);
+        IGameServer gameServer = new GameServer(4);
         Naming.rebind("//" + HOST_NAME + ":" + PORT + "/" + GameServerName, gameServer);
 
         System.out.println( "Bindings Finished, waiting for client requests." );
@@ -92,6 +91,8 @@ public class RMIServer
 
         System.out.println("Maze server navn: " + HOST_NAME);
         System.out.println("Maze server ip:   " + myAdress.getHostAddress());
+
+        System.setProperty("java.rmi.server.hostname", myAdress.getHostAddress());
     }
 
     public static int getRMIPort() { return PORT; }
@@ -100,7 +101,7 @@ public class RMIServer
 
     public static void main ( String[] args ) throws Exception {
         try {
-            rmi = new RMIServer();
+            rmi = new RMIServer(args);
         }
         catch ( java.rmi.UnknownHostException uhe ) {
             System.out.println( "Maskinnavnet, " + HOST_NAME + " er ikke korrekt." );
